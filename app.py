@@ -1,0 +1,105 @@
+"""
+app.py — Solar PV Defect Detection System
+Run with: python app.py
+"""
+import os
+import secrets
+from flask import Flask, jsonify, send_from_directory, render_template
+from flask_cors import CORS
+
+
+def create_app() -> Flask:
+    app = Flask(__name__)
+
+    # ── Import config INSIDE factory to avoid circular import ─────────────
+    import config as cfg
+
+    # ── Security ──────────────────────────────────────────────────────────
+    app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    app.config["SESSION_COOKIE_SECURE"] = (
+        os.environ.get("PRODUCTION", "false").lower() == "true"
+    )
+    app.config["MAX_CONTENT_LENGTH"] = cfg.MAX_CONTENT_LENGTH
+
+    # ── CORS ──────────────────────────────────────────────────────────────
+    CORS(app, supports_credentials=True,
+         origins=[
+             "http://localhost:3000",
+             "http://127.0.0.1:5000",
+             "http://0.0.0.0:5000",
+         ])
+
+    # ── Register blueprints ────────────────────────────────────────────────
+    from auth import auth_bp
+    from modules.el_upload   import el_bp
+    from modules.integrity   import integrity_bp
+    from modules.detection   import detection_bp
+    from modules.thermal     import thermal_bp
+    from modules.carbon      import carbon_bp
+    from modules.xai         import xai_bp
+    from modules.llm_summary import llm_bp
+    from modules.chatbot     import chatbot_bp
+    from modules.weather     import weather_bp
+
+    for bp in (auth_bp, el_bp, integrity_bp, detection_bp,
+               thermal_bp, carbon_bp, xai_bp, llm_bp,
+               chatbot_bp, weather_bp):
+        app.register_blueprint(bp)
+
+    # ── Static file routes ─────────────────────────────────────────────────
+    @app.route("/uploads/<path:filename>")
+    def serve_upload(filename):
+        return send_from_directory(cfg.UPLOAD_FOLDER, filename)
+
+    @app.route("/results/<path:filename>")
+    def serve_result(filename):
+        return send_from_directory(cfg.RESULT_FOLDER, filename)
+
+    @app.route("/explanations/<path:filename>")
+    def serve_explanation(filename):
+        return send_from_directory(cfg.EXPLAIN_FOLDER, filename)
+
+    @app.route("/thermal_uploads/<path:filename>")
+    def serve_thermal(filename):
+        return send_from_directory(cfg.THERMAL_UPLOAD_FOLDER, filename)
+
+    # ── Page routes ────────────────────────────────────────────────────────
+    @app.route("/")
+    @app.route("/login")
+    def login_page():
+        return render_template("login.html")
+
+    @app.route("/dashboard")
+    def dashboard():
+        return render_template("dashboard.html")
+
+    # ── Health check ───────────────────────────────────────────────────────
+    @app.route("/api/health")
+    def health():
+        return jsonify({"status": "ok", "service": "Solar PV Defect Detection"}), 200
+
+    # ── Error handlers ─────────────────────────────────────────────────────
+    @app.errorhandler(404)
+    def not_found(_):
+        return jsonify({"error": "Endpoint not found."}), 404
+
+    @app.errorhandler(413)
+    def too_large(_):
+        return jsonify({"error": "File too large. Maximum is 50 MB."}), 413
+
+    @app.errorhandler(500)
+    def server_error(e):
+        return jsonify({"error": "Internal server error.", "detail": str(e)}), 500
+
+    return app
+
+
+if __name__ == "__main__":
+    application = create_app()
+    print("\n" + "=" * 55)
+    print("  Solar PV Defect Detection System")
+    print("  http://127.0.0.1:5000")
+    print("=" * 55 + "\n")
+    application.run(debug=True, host="0.0.0.0", port=5000)

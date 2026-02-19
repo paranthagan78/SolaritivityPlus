@@ -1,0 +1,3 @@
+timestamp,image_filename,city,panel_power_w,ambient_temp_c,irradiance_w_m2,emission_factor,num_defects,dominant_defect,total_degradation_pct,co2_kg_per_year
+2026-02-19T23:52:17.786428,fb83acf6c6024c4099b8b801b329e830.jpg,Delhi,380.0,25.0,900.0,0.85,2,crack,1.42,9.55
+2026-02-19T23:53:06.806821,dd203d7faf224a60812a6c2748291bb0.jpg,Delhi,380.0,25.0,900.0,0.85,2,crack,0.8,6.07

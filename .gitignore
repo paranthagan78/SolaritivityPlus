@@ -1,0 +1,165 @@
+# ══════════════════════════════════════════════════════════
+#  Solar PV Defect Detection System — .gitignore
+# ══════════════════════════════════════════════════════════
+
+# ── Environment & Secrets ──────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pyc
+
+# ── Virtual Environments ───────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+fyp_pvcell/
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# ── Pip / Poetry / PDM ────────────────────────────────────
+pip-log.txt
+pip-delete-this-directory.txt
+poetry.lock
+pdm.lock
+Pipfile.lock
+
+# ── ML Models (large binary files) ────────────────────────
+model/
+*.pt
+*.pth
+*.pkl
+*.gguf
+*.bin
+*.onnx
+*.h5
+*.pb
+*.tflite
+*.safetensors
+
+# ── Uploaded / Generated Images ───────────────────────────
+uploads/
+results/
+thermal_uploads/
+explanations/
+
+
+
+
+
+# ── Domain documents (may contain proprietary content) ────
+docs/
+
+# ── Logs ──────────────────────────────────────────────────
+*.log
+*.log.*
+logs/
+log/
+
+# ── OS files ──────────────────────────────────────────────
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# ── IDEs & Editors ────────────────────────────────────────
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Vim
+*.swp
+*.swo
+Session.vim
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# ── Testing ───────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.tox/
+.nox/
+nosetests.xml
+test-results/
+
+# ── Type checking ─────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# ── Flask / Werkzeug ──────────────────────────────────────
+instance/
+flask_session/
+
+# ── Node (if any frontend tooling added later) ────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# ── Misc ──────────────────────────────────────────────────
+*.bak
+*.tmp
+*.temp
+*.orig
+*.rej
+.cache/
+tmp/
+temp/

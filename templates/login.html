@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Solar PV — Login</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--a:#f59e0b;--bg:#0f172a;--card:#1e293b;--bd:#334155;--tx:#e2e8f0;--mu:#94a3b8;--er:#ef4444;--ok:#22c55e}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;color:var(--tx)}
+body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(245,158,11,.04)1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,.04)1px,transparent 1px);background-size:40px 40px;animation:g 20s linear infinite}
+@keyframes g{to{background-position:40px 40px}}
+.card{position:relative;z-index:1;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:2.4rem 2rem;width:min(400px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.logo{text-align:center;margin-bottom:2rem}
+.logo h1{font-size:1.15rem;font-weight:700;color:var(--a);margin-top:.5rem}
+.logo p{font-size:.78rem;color:var(--mu);margin-top:.25rem}
+label{font-size:.82rem;color:var(--mu);display:block;margin-bottom:.35rem}
+.iw{position:relative;margin-bottom:1.1rem}
+.iw input{width:100%;padding:.72rem 2.8rem .72rem .9rem;background:var(--bg);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:.95rem;letter-spacing:.08em;outline:none;transition:border-color .2s}
+.iw input:focus{border-color:var(--a)}
+.eye{position:absolute;right:.7rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mu)}
+.eye:hover{color:var(--tx)}
+.btn{width:100%;padding:.8rem;background:linear-gradient(135deg,var(--a),#d97706);border:none;border-radius:8px;color:#0f172a;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.88}.btn:disabled{opacity:.45;cursor:not-allowed}
+.bar{margin-top:.8rem;height:3px;background:var(--bd);border-radius:2px;overflow:hidden}
+.bar-fill{height:100%;background:var(--a);border-radius:2px;transition:width .4s,background .4s}
+.fb{min-height:1.3rem;font-size:.82rem;text-align:center;margin-top:.8rem}
+.fb.e{color:var(--er)}.fb.s{color:var(--ok)}
+@keyframes sp{to{transform:rotate(360deg)}}
+.sp{display:inline-block;width:14px;height:14px;border:2px solid #0f172a;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:.35rem}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+      <rect x="2" y="13" width="48" height="26" rx="3" fill="#1e3a5f" stroke="#f59e0b" stroke-width="1.8"/>
+      <line x1="2" y1="26" x2="50" y2="26" stroke="#f59e0b" stroke-width="1.4"/>
+      <line x1="19" y1="13" x2="19" y2="39" stroke="#f59e0b" stroke-width="1.4"/>
+      <line x1="36" y1="13" x2="36" y2="39" stroke="#f59e0b" stroke-width="1.4"/>
+      <line x1="26" y1="39" x2="26" y2="47" stroke="#f59e0b" stroke-width="1.8"/>
+      <line x1="15" y1="47" x2="37" y2="47" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="42" cy="9" r="4" fill="#f59e0b" opacity=".85"/>
+    </svg>
+    <h1>Solar PV Defect Detection</h1>
+    <p>Enter your access passcode to continue</p>
+  </div>
+  <label for="pc">Access Passcode</label>
+  <div class="iw">
+    <input id="pc" type="password" placeholder="••••••••" autocomplete="current-password"/>
+    <button class="eye" id="ey" type="button" title="Toggle visibility">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+      </svg>
+    </button>
+  </div>
+  <button class="btn" id="lb" onclick="doLogin()">Unlock System</button>
+  <div class="bar"><div class="bar-fill" id="bf" style="width:100%"></div></div>
+  <div class="fb" id="fb"></div>
+</div>
+<script>
+const MAX=5;let left=MAX;
+const pc=document.getElementById('pc'),fb=document.getElementById('fb'),lb=document.getElementById('lb'),bf=document.getElementById('bf');
+document.getElementById('ey').onclick=()=>{pc.type=pc.type==='password'?'text':'password'};
+pc.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+(async()=>{try{const r=await fetch('/api/auth/status',{credentials:'include'});const d=await r.json();if(d.authenticated)location.href='/dashboard';}catch(e){}})();
+async function doLogin(){
+  const p=pc.value.trim();
+  if(!p){show('Enter your passcode.','e');return;}
+  lb.disabled=true;lb.innerHTML='<span class="sp"></span>Verifying…';
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:p})});
+    const d=await r.json();
+    if(d.success){show('✓ Access granted — loading…','s');setTimeout(()=>location.href='/dashboard',800);}
+    else{pc.value='';fail(d);}
+  }catch(e){show('Network error.','e');}
+  finally{if(!document.querySelector('.fb.s')){lb.disabled=false;lb.textContent='Unlock System';}}
+}
+function fail(d){
+  if(d.code==='LOCKED_OUT'){
+    show(`🔒 Locked out. Retry in ${d.retry_after}s.`,'e');lb.disabled=true;
+    let t=d.retry_after;const iv=setInterval(()=>{t--;show(`🔒 Locked out. Retry in ${t}s.`,'e');if(t<=0){clearInterval(iv);lb.disabled=false;left=MAX;upBar();}},1000);return;
+  }
+  if(typeof d.attempts_remaining==='number'){left=d.attempts_remaining;upBar();}
+  show(left>0?`❌ Wrong passcode. ${left} attempt${left!==1?'s':''} left.`:'⛔ Max attempts reached.','e');
+}
+function upBar(){const p=(left/MAX)*100;bf.style.width=p+'%';bf.style.background=p>60?'#f59e0b':p>30?'#f97316':'#ef4444';}
+function show(m,t){fb.textContent=m;fb.className='fb '+t;}
+</script>
+</body>
+</html>
