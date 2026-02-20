@@ -39,3 +39,4 @@ langchain-google-genai>=1.0.0
 pypdf>=4.0.0
 sentence-transformers>=2.7.0
 ctransformers>=0.2.27
+reportlab>=4.0.0

@@ -1,62 +1,417 @@
 <!-- ══════════════════════════════════════════
-     PANEL: DETECT
+     PANEL: DETECT  —  Redesigned
+     Inline CSS only. All original IDs/functions preserved.
 ══════════════════════════════════════════ -->
-<div class="panel active" id="panel-detect">
-    <div class="grid2">
 
-        <!-- Left: upload + controls -->
-        <div class="card">
-            <div class="card-title">🔍 EL Image — Defect Detection</div>
+<style>
+    @keyframes _pd_fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(22px);
+        }
 
-            <div class="drop-zone" id="dz" onclick="document.getElementById('detectFile').click()"
-                ondragover="dzDrag(event,true)" ondragleave="dzDrag(event,false)" ondrop="dzDrop(event)">
-                <input type="file" id="detectFile" accept=".png,.jpg,.jpeg,.bmp" onchange="previewDetect(this)" />
-                <div>Drop EL image here or <strong style="color:var(--a)">click to browse</strong></div>
-                <div class="drop-hint">PNG · JPG · BMP · up to 50 MB</div>
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes _pd_dash {
+        0% {
+            stroke-dashoffset: 251;
+        }
+
+        50% {
+            stroke-dashoffset: 63;
+        }
+
+        100% {
+            stroke-dashoffset: 251;
+        }
+    }
+
+    @keyframes _pd_pulse {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+        }
+
+        50% {
+            box-shadow: 0 0 0 9px rgba(245, 158, 11, 0);
+        }
+    }
+
+    @keyframes _pd_imgReveal {
+        from {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes _pd_statusIn {
+        from {
+            opacity: 0;
+            transform: translateX(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes _pd_dotFlash {
+
+        0%,
+        80%,
+        100% {
+            opacity: 0.2;
+        }
+
+        40% {
+            opacity: 1;
+        }
+    }
+
+    @keyframes _pd_dropGlow {
+
+        0%,
+        100% {
+            border-color: rgba(245, 158, 11, 0.28);
+            background: rgba(245, 158, 11, 0.015);
+        }
+
+        50% {
+            border-color: rgba(245, 158, 11, 0.55);
+            background: rgba(245, 158, 11, 0.05);
+        }
+    }
+
+    @keyframes _pd_errorShake {
+
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+
+        20% {
+            transform: translateX(-8px);
+        }
+
+        40% {
+            transform: translateX(8px);
+        }
+
+        60% {
+            transform: translateX(-5px);
+        }
+
+        80% {
+            transform: translateX(5px);
+        }
+    }
+
+    @keyframes _pd_infoSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(6px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<!-- ════════════════════════════════════════
+     FULL-SCREEN OVERLAY
+════════════════════════════════════════ -->
+<div id="pd-overlay" style="
+  position:fixed;inset:0;z-index:9999;
+  background:#08080d;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.8rem;
+  opacity:0;pointer-events:none;
+  transition:opacity 0.55s cubic-bezier(0.22,1,0.36,1);
+">
+
+    <!-- Loading state -->
+    <div id="pd-overlay-loading" style="display:flex;flex-direction:column;align-items:center;gap:1.8rem;">
+
+        <!-- Ring spinner -->
+        <div style="position:relative;width:116px;height:116px;">
+            <svg viewBox="0 0 116 116" width="116" height="116" style="display:block;">
+                <circle cx="58" cy="58" r="40" fill="none" stroke="#181820" stroke-width="6" />
+                <circle cx="58" cy="58" r="40" fill="none" stroke="#f59e0b" stroke-width="6" stroke-linecap="round"
+                    stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 58 58)"
+                    style="animation:_pd_dash 1.8s ease-in-out infinite;" />
+            </svg>
+            <!-- Center icon -->
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+                <svg viewBox="0 0 52 52" width="34" height="34"
+                    style="stroke:#f59e0b;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;">
+                    <rect x="2" y="13" width="48" height="26" rx="3" />
+                    <line x1="2" y1="26" x2="50" y2="26" />
+                    <line x1="19" y1="13" x2="19" y2="39" />
+                    <line x1="36" y1="13" x2="36" y2="39" />
+                    <line x1="26" y1="39" x2="26" y2="47" />
+                    <line x1="14" y1="47" x2="38" y2="47" />
+                </svg>
+            </div>
+        </div>
+
+        <!-- Status text -->
+        <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:0.4rem;">
+            <div id="pd-status-text"
+                style="font-family:'Rajdhani',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#fff;">
+                Initialising</div>
+            <div id="pd-status-sub"
+                style="font-family:'DM Sans',sans-serif;font-size:0.78rem;color:#555;letter-spacing:0.06em;">Preparing
+                pipeline…</div>
+        </div>
+
+        <!-- Progress bar -->
+        <div style="width:260px;height:2px;background:#161620;border-radius:99px;overflow:hidden;">
+            <div id="pd-prog-bar"
+                style="height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:99px;width:0%;transition:width 0.6s cubic-bezier(0.22,1,0.36,1);">
+            </div>
+        </div>
+
+        <!-- Animated dots -->
+        <div style="display:flex;gap:5px;">
+            <span
+                style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#f59e0b;animation:_pd_dotFlash 1.4s ease-in-out infinite;"></span>
+            <span
+                style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#f59e0b;animation:_pd_dotFlash 1.4s 0.2s ease-in-out infinite;"></span>
+            <span
+                style="display:inline-block;width:5px;height:5px;border-radius:50%;background:#f59e0b;animation:_pd_dotFlash 1.4s 0.4s ease-in-out infinite;"></span>
+        </div>
+    </div>
+
+    <!-- Error state (hidden by default) -->
+    <div id="pd-overlay-error"
+        style="display:none;flex-direction:column;align-items:center;gap:1.1rem;text-align:center;animation:_pd_statusIn 0.4s ease both;">
+        <div id="pd-error-shake-wrap" style="display:flex;flex-direction:column;align-items:center;gap:1rem;">
+            <div
+                style="width:60px;height:60px;border:2px solid #ef4444;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(239,68,68,0.07);">
+                <svg viewBox="0 0 24 24" width="28" height="28"
+                    style="stroke:#ef4444;fill:none;stroke-width:2.2;stroke-linecap:round;">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+            </div>
+            <div
+                style="font-family:'Rajdhani',sans-serif;font-size:1.15rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#ef4444;">
+                Image Invalid</div>
+            <div id="pd-error-msg"
+                style="font-family:'DM Sans',sans-serif;font-size:0.8rem;color:#666;max-width:270px;line-height:1.65;">
+                The integrity check failed. Please upload a valid EL image (PNG, JPG, or BMP) and try again.
+            </div>
+            <button onclick="pdResetOverlay()"
+                style="margin-top:0.3rem;padding:0.6rem 2rem;border-radius:35px;border:1.5px solid #f59e0b;background:transparent;color:#f59e0b;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.85rem;letter-spacing:0.06em;cursor:pointer;transition:background 0.2s,color 0.2s;"
+                onmouseover="this.style.background='#f59e0b';this.style.color='#0a0a0a'"
+                onmouseout="this.style.background='transparent';this.style.color='#f59e0b'">Try Again</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- ════════════════════════════════════════
+     PANEL BODY
+════════════════════════════════════════ -->
+<div class="panel active" id="panel-detect" style="
+  padding:1.8rem 2rem;
+  background:#000000;
+  min-height:calc(100vh - 64px);
+  font-family:'DM Sans',sans-serif;
+  animation:_pd_fadeInUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+">
+
+    <!-- ── Header ── -->
+    <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.0rem;">
+        <div
+            style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff;">
+            EL Image — <span style="color:#f59e0b;">Defect Detection</span>
+        </div>
+        <div
+            style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
+            YOLO · Neural Pipeline</div>
+    </div>
+
+    <!-- ── Two-column split ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;height:520px;">
+
+        <!-- ╔═════════════════╗ -->
+        <!-- ║   LEFT: INPUT   ║ -->
+        <!-- ╚═════════════════╝ -->
+        <div style="background:#000000;border:1px solid #000000;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:box-shadow 0.25s;"
+            onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,0.08)'"
+            onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.04)'">
+            <!-- Label bar -->
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:0.2px solid #ffffff;">
+                <div
+                    style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0;animation:_pd_pulse 2.5s ease-in-out infinite;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#555;">Input</span>
             </div>
 
-            <div id="detectPreview" style="margin-top:.75rem"></div>
+            <!-- Body -->
+            <div style="flex:1;display:flex;flex-direction:column;padding:1.2rem;gap:1rem;overflow:hidden;">
 
-            <div class="divider"></div>
+                <!-- Drop zone -->
+                <div id="dz" onclick="document.getElementById('detectFile').click()"
+                    ondragover="dzDrag(event,true);this.style.borderColor='#f59e0b';this.style.background='rgba(245,158,11,0.06)';"
+                    ondragleave="dzDrag(event,false);this.style.borderColor='';this.style.background='';"
+                    ondrop="dzDrop(event);this.style.borderColor='';this.style.background='';"
+                    style="flex:1;border:1.5px dashed rgba(245,158,11,0.32);border-radius:12px;background:rgba(245,158,11,0.015);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0.65rem;cursor:pointer;transition:border-color 0.25s,background 0.25s;padding:1.5rem;animation:_pd_dropGlow 3.5s ease-in-out infinite;outline:none;">
+                    <input type="file" id="detectFile" accept=".png,.jpg,.jpeg,.bmp" onchange="previewDetect(this)"
+                        style="display:none;" />
 
-            <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
-                <button class="btn btn-ghost btn-sm" id="integrityBtn" onclick="runIntegrity()" disabled>
-                    🛡 Check Integrity
+                    <div
+                        style="width:46px;height:46px;border:1.5px solid rgba(245,158,11,0.45);border-radius:11px;display:flex;align-items:center;justify-content:center;background:rgba(245,158,11,0.07);">
+                        <svg viewBox="0 0 24 24" width="21" height="21"
+                            style="stroke:#f59e0b;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;">
+                            <polyline points="16 16 12 12 8 16" />
+                            <line x1="12" y1="12" x2="12" y2="21" />
+                            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                        </svg>
+                    </div>
+                    <div style="font-size:0.84rem;color:#666;text-align:center;line-height:1.6;">
+                        Drop EL image here or <strong style="color:#f59e0b;font-weight:600;">click to browse</strong>
+                    </div>
+                    <div
+                        style="font-size:0.71rem;color:#c0c0b8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:500;">
+                        PNG · JPG · BMP · up to 50 MB</div>
+                </div>
+
+                <!-- Preview (hidden until upload) -->
+                <div id="detectPreview"
+                    style="flex:1;display:none;align-items:center;justify-content:center;overflow:hidden;border-radius:10px;background:#fafaf8;border:1px solid #eeeee9;">
+                </div>
+
+                <!-- Integrity result (hidden, read by pipeline) -->
+                <div id="integrityResult"
+                    style="display:none;font-size:0.78rem;letter-spacing:0.04em;padding:0.5rem 0.75rem;border-radius:8px;">
+                </div>
+
+                <!-- Separator -->
+                <div
+                    style="height:1px;background:linear-gradient(90deg,transparent,#e5e5e0 20%,#e5e5e0 80%,transparent);flex-shrink:0;">
+                </div>
+
+                <!-- Proceed button -->
+                <button id="detectBtn" onclick="pdRunPipeline()" disabled
+                    style="border-radius:35px;background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);color:#0a0a0a;font-size:0.88rem;padding:0.72rem 1.5rem;font-weight:500;letter-spacing:0.04em;border:none;cursor:pointer;transition:transform 0.15s,box-shadow 0.2s,opacity 0.2s;width:100%;display:flex;align-items:center;justify-content:center;gap:0.5em;box-shadow:0 3px 16px rgba(245,158,11,0.3);font-family:'DM Sans',sans-serif;outline:none;opacity:0.38;"
+                    onmouseover="if(!this.disabled){this.style.boxShadow='0 6px 22px rgba(245,158,11,0.5)';this.style.transform='translateY(-2px)';}"
+                    onmouseout="if(!this.disabled){this.style.boxShadow='0 3px 16px rgba(245,158,11,0.3)';this.style.transform='';}"
+                    onmousedown="if(!this.disabled)this.style.transform='scale(0.97)'"
+                    onmouseup="if(!this.disabled)this.style.transform=''">
+                    <svg viewBox="0 0 24 24" width="14" height="14"
+                        style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                    Run Detection
                 </button>
-                <span id="integrityResult"></span>
+
+                <!-- Hidden original buttons preserved for JS -->
+                <button id="integrityBtn" onclick="runIntegrity()" disabled style="display:none;">Check
+                    Integrity</button>
+
+            </div>
+        </div><!-- /LEFT -->
+
+        <!-- ╔══════════════════╗ -->
+        <!-- ║  RIGHT: RESULT   ║ -->
+        <!-- ╚══════════════════╝ -->
+        <div style="background:#000000;border:1px solid #010101;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:box-shadow 0.25s;"
+            onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,0.08)'"
+            onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.04)'">
+            <!-- Label bar -->
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:0.2px solid #eeeee9;">
+                <div id="pd-result-dot"
+                    style="width:7px;height:7px;border-radius:50%;background:#d0d0c8;flex-shrink:0;transition:background 0.4s;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#555;">Detection
+                    Result</span>
             </div>
 
-            <button class="btn btn-primary btn-full" id="detectBtn" style="margin-top:.72rem" onclick="runDetect()"
-                disabled>
-                Run YOLO Detection
-            </button>
-        </div>
+            <!-- Body -->
+            <div id="pd-right-body"
+                style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem;overflow:hidden;position:relative;">
 
-        <!-- Right: result -->
-        <div class="card">
-            <div class="card-title">📊 Detection Result</div>
-            <div id="detectResult" style="color:var(--mu);font-size:.82rem;text-align:center;padding:2.5rem 1rem">
-                Upload an EL image and run detection to see results here.
+                <!-- Placeholder -->
+                <div id="pd-result-placeholder"
+                    style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;opacity:0.3;text-align:center;transition:opacity 0.3s;">
+                    <svg viewBox="0 0 24 24" width="52" height="52"
+                        style="stroke:#888;fill:none;stroke-width:1.2;stroke-linecap:round;">
+                        <rect x="3" y="3" width="18" height="18" rx="2.5" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <p
+                        style="font-size:0.76rem;color:#aaa;letter-spacing:0.1em;text-transform:uppercase;margin:0;font-family:'Rajdhani',sans-serif;font-weight:600;">
+                        Awaiting Detection</p>
+                </div>
+
+                <!-- Result image wrapper -->
+                <div id="pd-result-img-wrap"
+                    style="width:100%;height:100%;display:none;align-items:center;justify-content:center;">
+                </div>
+
+                <!-- Original detectResult div (kept for JS, hidden visually) -->
+                <div id="detectResult"
+                    style="display:none;width:0;height:0;overflow:hidden;position:absolute;pointer-events:none;"></div>
+
             </div>
-        </div>
 
-    </div><!-- /grid2 -->
+            <!-- Info strip -->
+            <div id="pd-result-info"
+                style="display:none;padding:0.6rem 1.4rem;border-top:1px solid #eeeee9;font-family:'DM Sans',sans-serif;font-size:0.77rem;color:#666;gap:1rem;flex-wrap:wrap;background:#fafaf8;flex-direction:row;align-items:center;animation:_pd_infoSlideUp 0.4s ease both;">
+            </div>
+
+        </div><!-- /RIGHT -->
+
+    </div><!-- /split -->
 
     <!-- Detection table -->
-    <div class="card" id="detectionsTableCard" style="display:none;margin-top:1rem">
-        <div class="card-title">🗂 Detection Table
-            <span style="margin-left:auto">
-                <span id="csvSavedBadge" class="badge badge-ok" style="display:none">✓ Saved to CSV</span>
-            </span>
+    <div id="detectionsTableCard"
+        style="display:none;margin-top:1.4rem;background:#fff;border:1px solid #e5e5e0;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);animation:_pd_fadeInUp 0.45s ease both;">
+        <div
+            style="display:flex;align-items:center;justify-content:space-between;padding:0.9rem 1.4rem;border-bottom:1px solid #eeeee9;">
+            <span
+                style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#555;">Detection
+                Table</span>
+            <span id="csvSavedBadge"
+                style="display:none;font-size:0.71rem;padding:0.22rem 0.8rem;border-radius:99px;background:rgba(34,197,94,0.1);color:#16a34a;border:1px solid rgba(34,197,94,0.25);letter-spacing:0.04em;font-family:'DM Sans',sans-serif;font-weight:500;">Saved
+                to CSV</span>
         </div>
-        <div style="overflow-x:auto">
-            <table>
+        <div style="overflow-x:auto;">
+            <table
+                style="width:100%;border-collapse:collapse;font-size:0.81rem;color:#333;font-family:'DM Sans',sans-serif;">
                 <thead>
                     <tr>
-                        <th>Class</th>
-                        <th>Confidence</th>
-                        <th>Bounding Box (x1,y1,x2,y2)</th>
-                        <th>Area Ratio</th>
+                        <th
+                            style="padding:0.6rem 1.4rem;text-align:left;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.11em;text-transform:uppercase;color:#999;background:#fafaf8;border-bottom:1px solid #eeeee9;">
+                            Class</th>
+                        <th
+                            style="padding:0.6rem 1.4rem;text-align:left;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.11em;text-transform:uppercase;color:#999;background:#fafaf8;border-bottom:1px solid #eeeee9;">
+                            Confidence</th>
+                        <th
+                            style="padding:0.6rem 1.4rem;text-align:left;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.11em;text-transform:uppercase;color:#999;background:#fafaf8;border-bottom:1px solid #eeeee9;">
+                            Bounding Box (x1,y1,x2,y2)</th>
+                        <th
+                            style="padding:0.6rem 1.4rem;text-align:left;font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.11em;text-transform:uppercase;color:#999;background:#fafaf8;border-bottom:1px solid #eeeee9;">
+                            Area Ratio</th>
                     </tr>
                 </thead>
                 <tbody id="detectionsBody"></tbody>
@@ -64,8 +419,262 @@
         </div>
     </div>
 
-    <!-- Next Step Button -->
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button class="btn btn-primary" onclick="nextTab('carbon')">Next Step: Carbon Prediction ➡</button>
+    <!-- Next step -->
+    <div style="display:flex;justify-content:flex-end;margin-top:1.3rem;">
+        <button onclick="nextTab('carbon')"
+            style="background:#0a0a0a;color:#f59e0b;font-size:0.85rem;padding:0.65rem 1.8rem;border-radius:35px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;letter-spacing:0.05em;display:inline-flex;align-items:center;gap:0.5em;box-shadow:0 3px 14px rgba(0,0,0,0.16);outline:none;transition:transform 0.15s,box-shadow 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(0,0,0,0.22)';"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.16)';"
+            onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''">
+            Next Step: Carbon Prediction
+            <svg viewBox="0 0 24 24" width="13" height="13"
+                style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+                <polyline points="9 18 15 12 9 6" />
+            </svg>
+        </button>
     </div>
+
 </div><!-- /panel-detect -->
+
+<!-- ════════════════════════════════════════
+     PIPELINE CONTROLLER SCRIPT
+     Intercepts the Proceed button to run
+     integrity → detect with full overlay flow.
+     Does NOT redefine runIntegrity / runDetect.
+════════════════════════════════════════ -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        var _running = false;
+
+        /* ── Overlay control ── */
+        function showOverlay() {
+            var o = document.getElementById('pd-overlay');
+            o.style.pointerEvents = 'all';
+            o.style.opacity = '1';
+        }
+        function hideOverlay(cb) {
+            var o = document.getElementById('pd-overlay');
+            o.style.opacity = '0';
+            o.style.pointerEvents = 'none';
+            setTimeout(function () { if (cb) cb(); }, 580);
+        }
+        function setStatus(main, sub) {
+            var t = document.getElementById('pd-status-text');
+            var s = document.getElementById('pd-status-sub');
+            if (t) { t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '_pd_statusIn 0.35s ease both'; t.textContent = main; }
+            if (s) { s.style.animation = 'none'; void s.offsetWidth; s.style.animation = '_pd_statusIn 0.35s 0.08s ease both'; s.textContent = sub; }
+        }
+        function setProgress(pct) {
+            var b = document.getElementById('pd-prog-bar');
+            if (b) b.style.width = pct + '%';
+        }
+        function showErrorState(msg) {
+            document.getElementById('pd-overlay-loading').style.display = 'none';
+            var eb = document.getElementById('pd-overlay-error');
+            eb.style.display = 'flex';
+            var em = document.getElementById('pd-error-msg');
+            if (em) em.textContent = msg || 'The integrity check failed. Please upload a valid EL image and try again.';
+            /* Shake animation */
+            var sw = document.getElementById('pd-error-shake-wrap');
+            if (sw) { sw.style.animation = 'none'; void sw.offsetWidth; sw.style.animation = '_pd_errorShake 0.5s ease both'; }
+        }
+
+        /* Exposed to retry button */
+        window.pdResetOverlay = function () {
+            hideOverlay(function () {
+                document.getElementById('pd-overlay-loading').style.display = 'flex';
+                document.getElementById('pd-overlay-error').style.display = 'none';
+                setProgress(0);
+                _running = false;
+            });
+        };
+
+        /* ── Patch previewDetect ── */
+        var _origPreview = window.previewDetect;
+        window.previewDetect = function (input) {
+            /* Call original */
+            if (typeof _origPreview === 'function') _origPreview(input);
+
+            if (input && input.files && input.files[0]) {
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    var dz = document.getElementById('dz');
+                    var prev = document.getElementById('detectPreview');
+                    if (dz) dz.style.display = 'none';
+                    if (prev) {
+                        prev.style.display = 'flex';
+                        prev.innerHTML = '<img src="' + e.target.result + '" alt="Input" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;animation:_pd_imgReveal 0.4s ease both;">';
+                    }
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+
+            /* Enable Proceed */
+            var btn = document.getElementById('detectBtn');
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        };
+
+        /* ── Main pipeline triggered by Proceed ── */
+        window.pdRunPipeline = function () {
+            if (_running) return;
+            _running = true;
+
+            /* Reset overlay */
+            setProgress(0);
+            document.getElementById('pd-overlay-loading').style.display = 'flex';
+            document.getElementById('pd-overlay-error').style.display = 'none';
+            showOverlay();
+
+            /* STEP 1 — Integrity */
+            setStatus('Integrity Check', 'Validating EL image format and structure…');
+            setProgress(18);
+
+            setTimeout(function () {
+                var origIntegrity = window.runIntegrity;
+                if (typeof origIntegrity !== 'function') {
+                    /* No integrity function — skip straight to detect */
+                    proceedToDetect();
+                    return;
+                }
+
+                /* Enable hidden button so original fn works */
+                var ib = document.getElementById('integrityBtn');
+                if (ib) ib.disabled = false;
+
+                /* Watch integrityResult div */
+                var resultEl = document.getElementById('integrityResult');
+                var resolved = false;
+
+                function onIntegrityResult() {
+                    if (resolved) return;
+                    resolved = true;
+                    var text = (resultEl.textContent || '').toLowerCase();
+                    var bad = text.indexOf('invalid') !== -1 || text.indexOf('corrupt') !== -1
+                        || text.indexOf('fail') !== -1 || text.indexOf('error') !== -1;
+
+                    if (bad) {
+                        setTimeout(function () { showErrorState(resultEl.textContent); }, 300);
+                        _running = false;
+                        return;
+                    }
+
+                    /* STEP 2 — Image valid */
+                    setStatus('Image Valid', 'EL format confirmed — launching YOLO inference…');
+                    setProgress(46);
+                    setTimeout(proceedToDetect, 950);
+                }
+
+                var obs = new MutationObserver(function () {
+                    if ((resultEl.textContent || '').trim().length > 0) {
+                        obs.disconnect();
+                        onIntegrityResult();
+                    }
+                });
+                obs.observe(resultEl, { childList: true, subtree: true, characterData: true });
+
+                /* Timeout fallback — treat as valid if no result in 8s */
+                setTimeout(function () {
+                    if (resolved) return;
+                    obs.disconnect();
+                    resolved = true;
+                    setStatus('Image Valid', 'Proceeding to detection…');
+                    setProgress(46);
+                    setTimeout(proceedToDetect, 700);
+                }, 8000);
+
+                origIntegrity();
+            }, 220);
+
+            /* ── STEP 3 — Run detect ── */
+            function proceedToDetect() {
+                setStatus('Running Detection', 'Neural network scanning for defects…');
+                setProgress(65);
+
+                var origDetect = window.runDetect;
+                if (typeof origDetect !== 'function') {
+                    setProgress(100);
+                    setTimeout(function () { hideOverlay(function () { _running = false; }); }, 600);
+                    return;
+                }
+
+                /* Watch detectResult for content */
+                var detectEl = document.getElementById('detectResult');
+                var settled = false;
+
+                function onDetectResult() {
+                    if (settled) return;
+                    settled = true;
+                    setStatus('Analysis Complete', 'Defects mapped — rendering results…');
+                    setProgress(100);
+                    setTimeout(function () {
+                        hideOverlay(function () {
+                            _running = false;
+                            renderResultPane(detectEl);
+                        });
+                    }, 650);
+                }
+
+                var obs2 = new MutationObserver(function () {
+                    var img = detectEl.querySelector('img');
+                    var spinner = detectEl.querySelector('.spinner');
+                    var hasContent = img || (!spinner && (detectEl.textContent || '').trim().length > 10 && (detectEl.textContent || '').indexOf('Upload') === -1);
+                    if (hasContent) { obs2.disconnect(); onDetectResult(); }
+                });
+                obs2.observe(detectEl, { childList: true, subtree: true, characterData: true, attributes: true });
+
+                /* 30s safety */
+                setTimeout(function () {
+                    if (settled) return;
+                    obs2.disconnect();
+                    onDetectResult();
+                }, 30000);
+
+                origDetect();
+            }
+        };
+
+        /* ── Render result into right pane ── */
+        function renderResultPane(sourceEl) {
+            var wrap = document.getElementById('pd-result-img-wrap');
+            var placeholder = document.getElementById('pd-result-placeholder');
+            var dot = document.getElementById('pd-result-dot');
+
+            var img = sourceEl.querySelector('img');
+            if (img) {
+                wrap.innerHTML = '<img src="' + img.src + '" alt="Detection result" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;animation:_pd_imgReveal 0.55s cubic-bezier(0.22,1,0.36,1) both;">';
+                wrap.style.display = 'flex';
+            } else {
+                var txt = (sourceEl.textContent || '').trim();
+                if (txt && txt.indexOf('Upload') === -1) {
+                    wrap.innerHTML = '<p style="font-size:0.84rem;color:#444;text-align:center;padding:1rem;line-height:1.6;">' + txt + '</p>';
+                    wrap.style.display = 'flex';
+                }
+            }
+
+            if (placeholder) placeholder.style.display = 'none';
+
+            /* Activate dot */
+            if (dot) { dot.style.background = '#f59e0b'; dot.style.animation = '_pd_pulse 2.5s ease-in-out infinite'; }
+
+            /* Info strip */
+            var info = document.getElementById('pd-result-info');
+            var count = document.querySelectorAll('#detectionsBody tr').length;
+            if (info) {
+                info.innerHTML =
+                    '<div style="display:flex;align-items:center;gap:0.4em;">' +
+                    '<svg viewBox="0 0 24 24" width="13" height="13" style="stroke:#22c55e;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>' +
+                    '<span style="color:#444;">Detection complete</span>' +
+                    '</div>' +
+                    (count > 0 ?
+                        '<div style="display:flex;align-items:center;gap:0.35em;">' +
+                        '<strong style="color:#0a0a0a;font-weight:700;">' + count + '</strong>&nbsp;defect' + (count > 1 ? 's' : '') + ' detected' +
+                        '</div>' : '') +
+                    '<div style="margin-left:auto;font-size:0.69rem;color:#c0c0b8;font-family:\'Rajdhani\',sans-serif;letter-spacing:0.08em;">' + new Date().toLocaleTimeString() + '</div>';
+                info.style.display = 'flex';
+            }
+        }
+
+    });
+</script>

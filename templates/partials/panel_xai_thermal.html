@@ -1,0 +1,539 @@
+<!-- ══════════════════════════════════════════
+     PANEL: XAI THERMAL  —  Auto-Flow GradCAM for Thermal
+     Cyan theme. Uses /api/thermal/gradcam.
+══════════════════════════════════════════ -->
+
+<style>
+    @keyframes _tx_fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(22px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes _tx_dash {
+        0% {
+            stroke-dashoffset: 251;
+        }
+
+        50% {
+            stroke-dashoffset: 63;
+        }
+
+        100% {
+            stroke-dashoffset: 251;
+        }
+    }
+
+    @keyframes _tx_pulse {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.45);
+        }
+
+        50% {
+            box-shadow: 0 0 0 9px rgba(6, 182, 212, 0);
+        }
+    }
+
+    @keyframes _tx_statusIn {
+        from {
+            opacity: 0;
+            transform: translateX(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes _tx_dotFlash {
+
+        0%,
+        80%,
+        100% {
+            opacity: 0.2;
+        }
+
+        40% {
+            opacity: 1;
+        }
+    }
+
+    @keyframes _tx_imgReveal {
+        from {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+</style>
+
+<!-- ════════════════════════════════════════
+     FULL-SCREEN OVERLAY (Thermal XAI)
+════════════════════════════════════════ -->
+<div id="tx-overlay" style="
+  position:fixed;inset:0;z-index:9999;
+  background:#08080d;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.2rem;
+  opacity:0;pointer-events:none;
+  transition:opacity 0.55s cubic-bezier(0.22,1,0.36,1);
+">
+    <div style="position:relative;width:100px;height:100px;">
+        <svg viewBox="0 0 116 116" width="100" height="100" style="display:block;">
+            <circle cx="58" cy="58" r="40" fill="none" stroke="#181820" stroke-width="5" />
+            <circle cx="58" cy="58" r="40" fill="none" stroke="#06b6d4" stroke-width="5" stroke-linecap="round"
+                stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 58 58)"
+                style="animation:_tx_dash 1.8s ease-in-out infinite;" />
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" width="28" height="28"
+                style="stroke:#06b6d4;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;">
+                <path
+                    d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z" />
+                <path
+                    d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z" />
+            </svg>
+        </div>
+    </div>
+
+    <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
+        <div id="tx-status-text"
+            style="font-family:'Rajdhani',sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#fff;">
+            Initialising</div>
+        <div id="tx-status-sub"
+            style="font-family:'DM Sans',sans-serif;font-size:0.75rem;color:#555;letter-spacing:0.04em;">Preparing
+            thermal explainability...</div>
+    </div>
+
+    <div style="width:280px;height:2px;background:#161620;border-radius:99px;overflow:hidden;">
+        <div id="tx-prog-bar"
+            style="height:100%;background:linear-gradient(90deg,#06b6d4,#22d3ee);border-radius:99px;width:0%;transition:width 0.7s cubic-bezier(0.22,1,0.36,1);">
+        </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:0.55rem;width:320px;margin-top:0.5rem;">
+        <div id="tx-step-1"
+            style="display:flex;align-items:center;gap:0.85rem;padding:0.65rem 1.2rem;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid transparent;transition:background 0.4s,border-color 0.4s;">
+            <div
+                style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <svg id="tx-step-1-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2;stroke-linecap:round;transition:stroke 0.3s;">
+                    <rect x="3" y="3" width="18" height="18" rx="2.5" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                </svg>
+            </div>
+            <div>
+                <div id="tx-step-1-label" style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;">
+                    Preparing Image</div>
+                <div id="tx-step-1-sub"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
+                </div>
+            </div>
+        </div>
+        <div id="tx-step-2"
+            style="display:flex;align-items:center;gap:0.85rem;padding:0.65rem 1.2rem;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid transparent;transition:background 0.4s,border-color 0.4s;">
+            <div
+                style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <svg id="tx-step-2-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:1.7;stroke-linecap:round;transition:stroke 0.3s;">
+                    <path
+                        d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2z" />
+                    <path
+                        d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2z" />
+                </svg>
+            </div>
+            <div>
+                <div id="tx-step-2-label" style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;">
+                    Generating Heatmap</div>
+                <div id="tx-step-2-sub"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
+                </div>
+            </div>
+        </div>
+        <div id="tx-step-3"
+            style="display:flex;align-items:center;gap:0.85rem;padding:0.65rem 1.2rem;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid transparent;transition:background 0.4s,border-color 0.4s;">
+            <div
+                style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <svg id="tx-step-3-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2.2;stroke-linecap:round;transition:stroke 0.3s;">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            </div>
+            <div>
+                <div id="tx-step-3-label" style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;">
+                    Rendering Results</div>
+                <div id="tx-step-3-sub"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:5px;">
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#06b6d4;animation:_tx_dotFlash 1.4s ease-in-out infinite;"></span>
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#06b6d4;animation:_tx_dotFlash 1.4s 0.2s ease-in-out infinite;"></span>
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#06b6d4;animation:_tx_dotFlash 1.4s 0.4s ease-in-out infinite;"></span>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PANEL BODY
+════════════════════════════════════════ -->
+<div class="panel" id="panel-xai-thermal" style="
+  padding:1.8rem 2rem;
+  background:#000000;
+  min-height:calc(100vh - 64px);
+  font-family:'DM Sans',sans-serif;
+  animation:_tx_fadeInUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.2rem;">
+        <div
+            style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff;">
+            Thermal <span style="color:#06b6d4;">GradCAM</span>
+        </div>
+        <div
+            style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
+            XAI · Neural Attention</div>
+    </div>
+
+    <!-- Two-column split -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;min-height:480px;">
+
+        <!-- LEFT: Heatmap -->
+        <div
+            style="background:#000000;border:1px solid #111;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:1px solid #1a1a24;">
+                <div id="tx-heatmap-dot"
+                    style="width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;transition:background 0.4s;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Thermal
+                    Activation Heatmap</span>
+            </div>
+            <div
+                style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.2rem;overflow:hidden;">
+                <div id="tx-heatmap-placeholder"
+                    style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;opacity:0.25;text-align:center;">
+                    <svg viewBox="0 0 24 24" width="48" height="48"
+                        style="stroke:#555;fill:none;stroke-width:1.2;stroke-linecap:round;">
+                        <rect x="3" y="3" width="18" height="18" rx="2.5" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <p
+                        style="font-size:0.76rem;color:#666;letter-spacing:0.1em;text-transform:uppercase;margin:0;font-family:'Rajdhani',sans-serif;font-weight:600;">
+                        Awaiting GradCAM</p>
+                </div>
+                <div id="tx-heatmap-wrap"
+                    style="display:none;width:100%;height:100%;align-items:center;justify-content:center;"></div>
+            </div>
+            <div id="tx-legend"
+                style="display:none;padding:0.6rem 1.4rem;border-top:1px solid #1a1a24;font-size:0.72rem;color:#888;">
+                <div style="display:flex;align-items:center;gap:1.2rem;justify-content:center;">
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <div
+                            style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#ef4444,#f97316);">
+                        </div>
+                        <span>Warm = high activation</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:0.35rem;">
+                        <div
+                            style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#3b82f6,#06b6d4);">
+                        </div>
+                        <span>Cool = low activation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Info -->
+        <div
+            style="background:#000000;border:1px solid #111;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);">
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:1px solid #1a1a24;">
+                <div id="tx-info-dot"
+                    style="width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;transition:background 0.4s;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Explainability
+                    Analysis</span>
+            </div>
+            <div
+                style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem;overflow-y:auto;">
+                <div id="tx-info-placeholder"
+                    style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;opacity:0.25;text-align:center;">
+                    <p
+                        style="font-size:0.76rem;color:#666;letter-spacing:0.1em;text-transform:uppercase;margin:0;font-family:'Rajdhani',sans-serif;font-weight:600;">
+                        Awaiting Analysis</p>
+                </div>
+                <div id="tx-info-container" style="display:none;width:100%;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Back button -->
+    <div style="display:flex;justify-content:flex-start;margin-top:1.3rem;">
+        <button onclick="window.switchThermalPanel('detect-thermal')"
+            style="background:#111;color:#06b6d4;font-size:0.85rem;padding:0.65rem 1.8rem;border-radius:35px;border:1px solid #222;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;letter-spacing:0.05em;display:inline-flex;align-items:center;gap:0.5em;box-shadow:0 3px 14px rgba(0,0,0,0.3);outline:none;transition:transform 0.15s,box-shadow 0.2s,border-color 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(0,0,0,0.4)';this.style.borderColor='#06b6d4'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.3)';this.style.borderColor='#222'">
+            <svg viewBox="0 0 24 24" width="13" height="13"
+                style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+                <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Back to Thermal Detect
+        </button>
+    </div>
+
+</div><!-- /panel-xai-thermal -->
+
+<!-- ════════════════════════════════════════
+     THERMAL XAI AUTO-PIPELINE CONTROLLER
+════════════════════════════════════════ -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        var _txRunning = false;
+        var _txHasRun = false;
+
+        function txShowOverlay() {
+            var o = document.getElementById('tx-overlay');
+            o.style.pointerEvents = 'all'; o.style.opacity = '1';
+        }
+        function txHideOverlay(cb) {
+            var o = document.getElementById('tx-overlay');
+            o.style.opacity = '0'; o.style.pointerEvents = 'none';
+            setTimeout(function () { if (cb) cb(); }, 600);
+        }
+        function txSetMain(main, sub) {
+            var t = document.getElementById('tx-status-text');
+            var s = document.getElementById('tx-status-sub');
+            if (t) { t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '_tx_statusIn 0.35s ease both'; t.textContent = main; }
+            if (s) { s.style.animation = 'none'; void s.offsetWidth; s.style.animation = '_tx_statusIn 0.35s 0.08s ease both'; s.textContent = sub; }
+        }
+        function txSetProgress(pct) {
+            var b = document.getElementById('tx-prog-bar');
+            if (b) b.style.width = pct + '%';
+        }
+        function txActivateStep(n, sub) {
+            var el = document.getElementById('tx-step-' + n);
+            if (el) { el.style.background = 'rgba(6,182,212,0.06)'; el.style.borderColor = 'rgba(6,182,212,0.2)'; }
+            var icon = document.getElementById('tx-step-' + n + '-icon');
+            if (icon) icon.style.stroke = '#06b6d4';
+            var lbl = document.getElementById('tx-step-' + n + '-label');
+            if (lbl) { lbl.style.color = '#fff'; lbl.style.fontWeight = '500'; }
+            var subEl = document.getElementById('tx-step-' + n + '-sub');
+            if (subEl) { subEl.textContent = sub || 'Processing...'; subEl.style.color = '#888'; }
+        }
+        function txCompleteStep(n, sub) {
+            var el = document.getElementById('tx-step-' + n);
+            if (el) { el.style.background = 'rgba(34,197,94,0.04)'; el.style.borderColor = 'rgba(34,197,94,0.15)'; }
+            var icon = document.getElementById('tx-step-' + n + '-icon');
+            if (icon) icon.style.stroke = '#22c55e';
+            var lbl = document.getElementById('tx-step-' + n + '-label');
+            if (lbl) { lbl.style.color = '#22c55e'; }
+            var subEl = document.getElementById('tx-step-' + n + '-sub');
+            if (subEl) { subEl.textContent = sub || 'Done'; subEl.style.color = '#5a9'; }
+        }
+
+        function txRenderResult(r) {
+            var heatWrap = document.getElementById('tx-heatmap-wrap');
+            var heatPH = document.getElementById('tx-heatmap-placeholder');
+            var heatDot = document.getElementById('tx-heatmap-dot');
+            var legend = document.getElementById('tx-legend');
+            var infoCont = document.getElementById('tx-info-container');
+            var infoPH = document.getElementById('tx-info-placeholder');
+            var infoDot = document.getElementById('tx-info-dot');
+
+            if (heatPH) heatPH.style.display = 'none';
+            if (heatDot) { heatDot.style.background = '#06b6d4'; heatDot.style.animation = '_tx_pulse 2.5s ease-in-out infinite'; }
+            if (heatWrap) {
+                heatWrap.innerHTML = '<img src="' + r.explanation_image + '?t=' + Date.now() + '" alt="Thermal GradCAM" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;animation:_tx_imgReveal 0.55s cubic-bezier(0.22,1,0.36,1) both;">';
+                heatWrap.style.display = 'flex';
+            }
+            if (legend) legend.style.display = 'block';
+
+            if (infoPH) infoPH.style.display = 'none';
+            if (infoDot) { infoDot.style.background = '#06b6d4'; infoDot.style.animation = '_tx_pulse 2.5s ease-in-out infinite'; }
+
+            var s = window.state || {};
+            var dets = s.thermalDetections || [];
+
+            var html = '';
+            html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">';
+            html += '<svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#06b6d4;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+            html += '<span style="font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">What is GradCAM?</span>';
+            html += '</div>';
+            html += '<p style="font-size:0.78rem;color:#999;line-height:1.65;margin:0 0 1rem 0;">GradCAM highlights the regions of the thermal image that most influenced the model\'s classification decision, helping engineers understand which hotspots or anomalies the neural network focused on.</p>';
+
+            html += '<div style="height:1px;background:linear-gradient(90deg,transparent,#1a1a24 20%,#1a1a24 80%,transparent);margin-bottom:1rem;"></div>';
+
+            html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">';
+            html += '<svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#06b6d4;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+            html += '<span style="font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">How to Read</span>';
+            html += '</div>';
+            html += '<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;">';
+            html += '<div style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.78rem;color:#999;line-height:1.55;">';
+            html += '<div style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#ef4444,#f97316);flex-shrink:0;margin-top:4px;"></div>';
+            html += '<span><strong style="color:#ef4444;">Warm regions</strong> (red/orange) = high neural activation driving the prediction.</span>';
+            html += '</div>';
+            html += '<div style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.78rem;color:#999;line-height:1.55;">';
+            html += '<div style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#3b82f6,#06b6d4);flex-shrink:0;margin-top:4px;"></div>';
+            html += '<span><strong style="color:#3b82f6;">Cool regions</strong> (blue/cyan) = low activation, minimal impact.</span>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '<div style="height:1px;background:linear-gradient(90deg,transparent,#1a1a24 20%,#1a1a24 80%,transparent);margin-bottom:1rem;"></div>';
+
+            html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">';
+            html += '<svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#06b6d4;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+            html += '<span style="font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">Detection Context</span>';
+            html += '</div>';
+
+            if (dets.length > 0) {
+                html += '<div style="display:flex;flex-direction:column;gap:0.35rem;">';
+                dets.forEach(function (d) {
+                    var conf = (d.confidence * 100).toFixed(1);
+                    html += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.6rem;background:#0c0c14;border:1px solid #1a1a24;border-radius:8px;font-size:0.76rem;color:#ccc;">';
+                    html += '<div style="width:7px;height:7px;border-radius:50%;background:#06b6d4;flex-shrink:0;"></div>';
+                    html += '<span>' + d.class_name + '</span>';
+                    html += '<span style="margin-left:auto;font-size:0.68rem;color:#888;font-family:\'Rajdhani\',sans-serif;font-weight:600;">' + conf + '%</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            } else {
+                html += '<p style="font-size:0.76rem;color:#555;font-style:italic;margin:0;">No defects detected.</p>';
+            }
+
+            html += '<div style="display:flex;align-items:center;gap:0.4rem;margin-top:1rem;font-size:0.68rem;color:#555;">';
+            html += '<svg viewBox="0 0 24 24" width="11" height="11" style="stroke:#555;fill:none;stroke-width:2;stroke-linecap:round;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+            html += 'Generated at ' + new Date().toLocaleTimeString();
+            html += '</div>';
+
+            if (infoCont) {
+                infoCont.innerHTML = html;
+                infoCont.style.display = 'block';
+                infoCont.style.animation = '_tx_imgReveal 0.5s cubic-bezier(0.22,1,0.36,1) both';
+            }
+        }
+
+        /* ── Auto-pipeline ── */
+        window.txAutoRun = async function () {
+            if (_txRunning) return;
+            if (_txHasRun) return;
+            _txRunning = true;
+
+            var s = window.state || {};
+            var imageFile = s.thermalDetectFile;
+
+            if (!imageFile) {
+                var infoCont = document.getElementById('tx-info-container');
+                var infoPH = document.getElementById('tx-info-placeholder');
+                if (infoPH) infoPH.style.display = 'none';
+                if (infoCont) {
+                    infoCont.innerHTML = '<div style="text-align:center;padding:2rem;color:#f59e0b;font-size:0.85rem;">' +
+                        '<svg viewBox="0 0 24 24" width="32" height="32" style="stroke:#f59e0b;fill:none;stroke-width:2;stroke-linecap:round;display:block;margin:0 auto 0.8rem;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+                        'No thermal image available. Please upload in Thermal Detect first.</div>';
+                    infoCont.style.display = 'block';
+                }
+                _txRunning = false;
+                return;
+            }
+
+            txSetProgress(0);
+            txSetMain('Initialising', 'Preparing thermal explainability...');
+            txShowOverlay();
+
+            await new Promise(function (r) { setTimeout(r, 350); });
+
+            try {
+                txActivateStep(1, 'Loading thermal image...');
+                txSetMain('Preparing Image', 'Using image from thermal detection...');
+                txSetProgress(20);
+
+                var fd = new FormData();
+                fd.append('image', imageFile);
+
+                await new Promise(function (r) { setTimeout(r, 500); });
+                txCompleteStep(1, (s.thermalFilename || 'image') + ' ready');
+                txSetProgress(30);
+
+                txActivateStep(2, 'Running neural network backward pass...');
+                txSetMain('Generating Heatmap', 'Computing gradient-weighted activations...');
+                txSetProgress(45);
+
+                var r = await window.apiForm('/api/thermal/gradcam', fd);
+
+                if (r.success) {
+                    txCompleteStep(2, 'Heatmap generated');
+                    txSetProgress(85);
+
+                    txActivateStep(3, 'Building visualisation...');
+                    txSetMain('Rendering Results', 'Preparing display...');
+                    txSetProgress(95);
+
+                    await new Promise(function (res) { setTimeout(res, 500); });
+                    txCompleteStep(3, 'Complete');
+                    txSetProgress(100);
+
+                    await new Promise(function (res) { setTimeout(res, 400); });
+
+                    txHideOverlay(function () {
+                        _txRunning = false;
+                        _txHasRun = true;
+                        txRenderResult(r);
+                    });
+
+                } else {
+                    txSetMain('GradCAM Failed', r.error || 'Unknown error');
+                    txSetProgress(100);
+                    await new Promise(function (res) { setTimeout(res, 1500); });
+                    txHideOverlay(function () {
+                        _txRunning = false; _txHasRun = true;
+                        var c = document.getElementById('tx-info-container');
+                        var p = document.getElementById('tx-info-placeholder');
+                        if (p) p.style.display = 'none';
+                        if (c) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' + (r.error || 'GradCAM failed') + '</div>'; c.style.display = 'block'; }
+                    });
+                }
+
+            } catch (err) {
+                txSetMain('Pipeline Error', err.message || 'Connection failed');
+                txSetProgress(100);
+                await new Promise(function (res) { setTimeout(res, 1500); });
+                txHideOverlay(function () {
+                    _txRunning = false; _txHasRun = true;
+                    var c = document.getElementById('tx-info-container');
+                    var p = document.getElementById('tx-info-placeholder');
+                    if (p) p.style.display = 'none';
+                    if (c) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' + (err.message || 'Pipeline error') + '</div>'; c.style.display = 'block'; }
+                });
+            }
+        };
+
+        window.txReset = function () { _txHasRun = false; _txRunning = false; };
+
+    });
+</script>

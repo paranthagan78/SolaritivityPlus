@@ -1,74 +1,919 @@
 <!-- ══════════════════════════════════════════
-     PANEL: CARBON
+     PANEL: CARBON  —  Auto-Flow Redesign
+     Auto-detects location, temperature, predicts CO₂.
+     Full-screen loader with step-by-step progress.
 ══════════════════════════════════════════ -->
-<div class="panel" id="panel-carbon">
-    <div class="grid2">
 
-        <!-- Left: inputs -->
-        <div class="card">
-            <div class="card-title">🌍 Carbon Emission Prediction</div>
+<style>
+    @keyframes _pc_fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(22px);
+        }
 
-            <!-- Location bar -->
-            <div class="loc-bar">
-                <span>📍</span>
-                <span id="locCity" class="loc-val">—</span>
-                <span class="sep">|</span>
-                <span>🌡</span>
-                <span id="locTemp" class="loc-val">— °C</span>
-                <button class="btn btn-ghost btn-sm" onclick="fetchWeather()" style="margin-left:auto">
-                    Auto-fill
-                </button>
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes _pc_dash {
+        0% {
+            stroke-dashoffset: 251;
+        }
+
+        50% {
+            stroke-dashoffset: 63;
+        }
+
+        100% {
+            stroke-dashoffset: 251;
+        }
+    }
+
+    @keyframes _pc_pulse {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+        }
+
+        50% {
+            box-shadow: 0 0 0 9px rgba(245, 158, 11, 0);
+        }
+    }
+
+    @keyframes _pc_statusIn {
+        from {
+            opacity: 0;
+            transform: translateX(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes _pc_dotFlash {
+
+        0%,
+        80%,
+        100% {
+            opacity: 0.2;
+        }
+
+        40% {
+            opacity: 1;
+        }
+    }
+
+    @keyframes _pc_resultReveal {
+        from {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes _pc_stepCheck {
+        from {
+            transform: scale(0);
+            opacity: 0;
+        }
+
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes _pc_shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+
+        100% {
+            background-position: 200% 0;
+        }
+    }
+
+    /* Step tracker */
+    .pc-step {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        padding: 0.65rem 1.2rem;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+        transition: background 0.4s, border-color 0.4s;
+        border: 1px solid transparent;
+    }
+
+    .pc-step.active {
+        background: rgba(245, 158, 11, 0.06);
+        border-color: rgba(245, 158, 11, 0.2);
+    }
+
+    .pc-step.done {
+        background: rgba(34, 197, 94, 0.04);
+        border-color: rgba(34, 197, 94, 0.15);
+    }
+
+    .pc-step-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        transition: background 0.4s, border-color 0.4s;
+        flex-shrink: 0;
+    }
+
+    .pc-step.active .pc-step-icon {
+        background: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .pc-step.done .pc-step-icon {
+        background: rgba(34, 197, 94, 0.1);
+        border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    .pc-step-label {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.82rem;
+        color: #555;
+        transition: color 0.3s;
+    }
+
+    .pc-step.active .pc-step-label {
+        color: #fff;
+        font-weight: 500;
+    }
+
+    .pc-step.done .pc-step-label {
+        color: #22c55e;
+    }
+
+    .pc-step-sub {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.68rem;
+        color: #444;
+        margin-top: 0.15rem;
+        transition: color 0.3s;
+    }
+
+    .pc-step.active .pc-step-sub {
+        color: #888;
+    }
+
+    .pc-step.done .pc-step-sub {
+        color: #5a9;
+    }
+
+    /* Defect summary items */
+    .pc-def-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.55rem;
+        border-radius: 8px;
+        background: #0c0c14;
+        border: 1px solid #1a1a24;
+        font-size: 0.76rem;
+        color: #ccc;
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .pc-def-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .pc-def-conf {
+        margin-left: auto;
+        font-size: 0.68rem;
+        color: #888;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+    }
+
+    /* Result metric card */
+    .pc-metric {
+        text-align: center;
+        padding: 1rem 0.5rem;
+        background: #fafaf8;
+        border: 1px solid #eeeee9;
+        border-radius: 12px;
+    }
+
+    .pc-metric-val {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #0a0a0a;
+        letter-spacing: 0.02em;
+    }
+
+    .pc-metric-lbl {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #888;
+        margin-top: 0.15rem;
+    }
+
+    /* Result detail row */
+    .pc-detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.45rem 0;
+        border-bottom: 1px solid #eeeee9;
+        font-size: 0.78rem;
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    .pc-detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .pc-detail-key {
+        color: #888;
+    }
+
+    .pc-detail-val {
+        color: #333;
+        font-weight: 500;
+    }
+</style>
+
+<!-- ════════════════════════════════════════
+     FULL-SCREEN OVERLAY (Carbon Auto-Pipeline)
+════════════════════════════════════════ -->
+<div id="pc-overlay" style="
+  position:fixed;inset:0;z-index:9999;
+  background:#08080d;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.2rem;
+  opacity:0;pointer-events:none;
+  transition:opacity 0.55s cubic-bezier(0.22,1,0.36,1);
+">
+    <!-- Spinner ring -->
+    <div style="position:relative;width:100px;height:100px;">
+        <svg viewBox="0 0 116 116" width="100" height="100" style="display:block;">
+            <circle cx="58" cy="58" r="40" fill="none" stroke="#181820" stroke-width="5" />
+            <circle cx="58" cy="58" r="40" fill="none" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"
+                stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 58 58)"
+                style="animation:_pc_dash 1.8s ease-in-out infinite;" />
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" width="28" height="28"
+                style="stroke:#f59e0b;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;">
+                <path d="M2 22 C2 22 6 18 12 18 C18 18 22 12 22 4 C22 4 18 8 12 8 C6 8 2 14 2 22Z" />
+                <line x1="12" y1="18" x2="12" y2="22" />
+            </svg>
+        </div>
+    </div>
+
+    <!-- Main status -->
+    <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
+        <div id="pc-status-text"
+            style="font-family:'Rajdhani',sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#fff;">
+            Initialising</div>
+        <div id="pc-status-sub"
+            style="font-family:'DM Sans',sans-serif;font-size:0.75rem;color:#555;letter-spacing:0.04em;">Preparing
+            carbon pipeline...</div>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="width:280px;height:2px;background:#161620;border-radius:99px;overflow:hidden;">
+        <div id="pc-prog-bar"
+            style="height:100%;background:linear-gradient(90deg,#f59e0b,#fbbf24);border-radius:99px;width:0%;transition:width 0.7s cubic-bezier(0.22,1,0.36,1);">
+        </div>
+    </div>
+
+    <!-- Step tracker -->
+    <div style="display:flex;flex-direction:column;gap:0.55rem;width:320px;margin-top:0.5rem;">
+
+        <!-- Step 1: Location -->
+        <div class="pc-step" id="pc-step-1">
+            <div class="pc-step-icon">
+                <svg id="pc-step-1-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s;">
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                </svg>
             </div>
-
-            <div id="carbonNote" class="alert alert-wa" style="margin-bottom:.9rem">
-                ⚠ Run detection first, then predict carbon emission.
+            <div>
+                <div class="pc-step-label">Detecting Location</div>
+                <div class="pc-step-sub" id="pc-step-1-sub">Waiting...</div>
             </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>City</label>
-                    <select id="carbonCity">
-                        <option>Chennai</option>
-                        <option>Mumbai</option>
-                        <option>Delhi</option>
-                        <option>Bangalore</option>
-                        <option>Hyderabad</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Panel Power (W)</label>
-                    <input type="number" id="carbonPower" value="380" min="1" />
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Ambient Temp (°C)</label>
-                    <input type="number" id="carbonTemp" value="32" />
-                </div>
-                <div class="form-group">
-                    <label>Irradiance (W/m²)</label>
-                    <input type="number" id="carbonIrr" value="900" min="0" />
-                </div>
-            </div>
-
-            <button class="btn btn-primary btn-full" onclick="runCarbon()">
-                Predict CO₂ Emission
-            </button>
         </div>
 
-        <!-- Right: result -->
-        <div class="card">
-            <div class="card-title">📈 Carbon Results</div>
-            <div id="carbonResult" style="color:var(--mu);font-size:.82rem;text-align:center;padding:2.5rem 1rem">
-                Carbon prediction will appear here.
+        <!-- Step 2: Temperature -->
+        <div class="pc-step" id="pc-step-2">
+            <div class="pc-step-icon">
+                <svg id="pc-step-2-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2;stroke-linecap:round;transition:stroke 0.3s;">
+                    <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+                </svg>
+            </div>
+            <div>
+                <div class="pc-step-label">Fetching Temperature</div>
+                <div class="pc-step-sub" id="pc-step-2-sub">Waiting...</div>
+            </div>
+        </div>
+
+        <!-- Step 3: Prediction -->
+        <div class="pc-step" id="pc-step-3">
+            <div class="pc-step-icon">
+                <svg id="pc-step-3-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s;">
+                    <path d="M2 22 C2 22 6 18 12 18 C18 18 22 12 22 4 C22 4 18 8 12 8 C6 8 2 14 2 22Z" />
+                    <line x1="12" y1="18" x2="12" y2="22" />
+                </svg>
+            </div>
+            <div>
+                <div class="pc-step-label">Predicting Emission</div>
+                <div class="pc-step-sub" id="pc-step-3-sub">Waiting...</div>
+            </div>
+        </div>
+
+        <!-- Step 4: Complete -->
+        <div class="pc-step" id="pc-step-4">
+            <div class="pc-step-icon">
+                <svg id="pc-step-4-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s;">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            </div>
+            <div>
+                <div class="pc-step-label">Finalising</div>
+                <div class="pc-step-sub" id="pc-step-4-sub">Waiting...</div>
             </div>
         </div>
 
     </div>
 
-    <!-- Next Step Button -->
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-        <button class="btn btn-primary" onclick="nextTab('xai')">Next Step: XAI Analysis ➡</button>
+    <!-- Animated dots -->
+    <div style="display:flex;gap:5px;">
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#f59e0b;animation:_pc_dotFlash 1.4s ease-in-out infinite;"></span>
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#f59e0b;animation:_pc_dotFlash 1.4s 0.2s ease-in-out infinite;"></span>
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#f59e0b;animation:_pc_dotFlash 1.4s 0.4s ease-in-out infinite;"></span>
     </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PANEL BODY
+════════════════════════════════════════ -->
+<div class="panel" id="panel-carbon" style="
+  padding:1.8rem 2rem;
+  background:#000000;
+  min-height:calc(100vh - 64px);
+  font-family:'DM Sans',sans-serif;
+  animation:_pc_fadeInUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+">
+
+    <!-- ── Header ── -->
+    <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.2rem;">
+        <div
+            style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff;">
+            Carbon <span style="color:#f59e0b;">Emission Prediction</span>
+        </div>
+        <div
+            style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
+            CO&#8322; · Climate Model</div>
+    </div>
+
+    <!-- ── Two-column split ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;min-height:480px;">
+
+        <!-- ╔══════════════════════╗ -->
+        <!-- ║  LEFT: INPUT PARAMS  ║ -->
+        <!-- ╚══════════════════════╝ -->
+        <div style="background:#000000;border:1px solid #111;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:box-shadow 0.25s;"
+            onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,0.08)'"
+            onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.04)'">
+            <!-- Label bar -->
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:1px solid #1a1a24;">
+                <div
+                    style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0;animation:_pc_pulse 2.5s ease-in-out infinite;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Model
+                    Input</span>
+            </div>
+
+            <!-- Body -->
+            <div style="flex:1;display:flex;flex-direction:column;padding:1.2rem 1.4rem;gap:1rem;overflow-y:auto;">
+
+                <!-- Detection summary section -->
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
+                    <svg viewBox="0 0 24 24" width="14" height="14"
+                        style="stroke:#f59e0b;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;">
+                        <rect x="3" y="3" width="18" height="18" rx="2.5" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                    <span
+                        style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">Detection
+                        Summary</span>
+                </div>
+
+                <!-- Defect list -->
+                <div id="pc-defect-list" style="display:flex;flex-direction:column;gap:0.4rem;">
+                    <div style="font-size:0.76rem;color:#555;font-style:italic;">No detection data yet. Run detection
+                        first.</div>
+                </div>
+
+                <!-- Divider -->
+                <div
+                    style="height:1px;background:linear-gradient(90deg,transparent,#1a1a24 20%,#1a1a24 80%,transparent);">
+                </div>
+
+                <!-- Parameters section -->
+                <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <svg viewBox="0 0 24 24" width="14" height="14"
+                        style="stroke:#f59e0b;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    <span
+                        style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">Parameters</span>
+                </div>
+
+                <!-- Param grid -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+                    <div style="background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;padding:0.65rem 0.8rem;">
+                        <div
+                            style="font-family:'Rajdhani',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#666;margin-bottom:0.2rem;">
+                            City</div>
+                        <div id="pc-param-city" style="font-size:0.84rem;color:#ccc;font-weight:500;">Auto-detecting...
+                        </div>
+                    </div>
+                    <div style="background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;padding:0.65rem 0.8rem;">
+                        <div
+                            style="font-family:'Rajdhani',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#666;margin-bottom:0.2rem;">
+                            Temperature</div>
+                        <div id="pc-param-temp" style="font-size:0.84rem;color:#ccc;font-weight:500;">Auto-detecting...
+                        </div>
+                    </div>
+                    <div style="background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;padding:0.65rem 0.8rem;">
+                        <div
+                            style="font-family:'Rajdhani',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#666;margin-bottom:0.2rem;">
+                            Panel Power</div>
+                        <div id="pc-param-power" style="font-size:0.84rem;color:#ccc;font-weight:500;">380 W</div>
+                    </div>
+                    <div style="background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;padding:0.65rem 0.8rem;">
+                        <div
+                            style="font-family:'Rajdhani',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#666;margin-bottom:0.2rem;">
+                            Irradiance</div>
+                        <div id="pc-param-irr" style="font-size:0.84rem;color:#ccc;font-weight:500;">900 W/m&#178;</div>
+                    </div>
+                </div>
+
+                <!-- Image info -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+                    <div style="background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;padding:0.65rem 0.8rem;">
+                        <div
+                            style="font-family:'Rajdhani',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#666;margin-bottom:0.2rem;">
+                            Resolution</div>
+                        <div id="pc-param-res" style="font-size:0.84rem;color:#ccc;font-weight:500;">--</div>
+                    </div>
+                    <div style="background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;padding:0.65rem 0.8rem;">
+                        <div
+                            style="font-family:'Rajdhani',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#666;margin-bottom:0.2rem;">
+                            Filename</div>
+                        <div id="pc-param-file"
+                            style="font-size:0.84rem;color:#ccc;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            --</div>
+                    </div>
+                </div>
+
+            </div>
+        </div><!-- /LEFT -->
+
+        <!-- ╔══════════════════════╗ -->
+        <!-- ║   RIGHT: RESULTS     ║ -->
+        <!-- ╚══════════════════════╝ -->
+        <div style="background:#000000;border:1px solid #111;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:box-shadow 0.25s;"
+            onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,0.08)'"
+            onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.04)'">
+            <!-- Label bar -->
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:1px solid #1a1a24;">
+                <div id="pc-result-dot"
+                    style="width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;transition:background 0.4s;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Carbon
+                    Results</span>
+            </div>
+
+            <div
+                style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem;overflow-y:auto;position:relative;">
+
+                <!-- Placeholder -->
+                <div id="pc-result-placeholder"
+                    style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;opacity:0.25;text-align:center;">
+                    <svg viewBox="0 0 24 24" width="48" height="48"
+                        style="stroke:#555;fill:none;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                    </svg>
+                    <p
+                        style="font-size:0.76rem;color:#666;letter-spacing:0.1em;text-transform:uppercase;margin:0;font-family:'Rajdhani',sans-serif;font-weight:600;">
+                        Awaiting Prediction</p>
+                </div>
+
+                <!-- Result container -->
+                <div id="pc-result-container"
+                    style="display:none;width:100%;animation:_pc_resultReveal 0.5s cubic-bezier(0.22,1,0.36,1) both;">
+                </div>
+
+            </div>
+        </div><!-- /RIGHT -->
+
+    </div><!-- /split -->
+
+    <!-- Hidden form fields used by runCarbon() -->
+    <select id="carbonCity" style="display:none;">
+        <option>Chennai</option>
+        <option>Mumbai</option>
+        <option>Delhi</option>
+        <option>Bangalore</option>
+        <option>Hyderabad</option>
+    </select>
+    <input type="hidden" id="carbonPower" value="380" />
+    <input type="hidden" id="carbonTemp" value="32" />
+    <input type="hidden" id="carbonIrr" value="900" />
+    <div id="carbonResult" style="display:none;"></div>
+    <div id="carbonNote" style="display:none;"></div>
+    <span id="locCity" style="display:none;">--</span>
+    <span id="locTemp" style="display:none;">--</span>
+
+    <!-- Next step -->
+    <div style="display:flex;justify-content:flex-end;margin-top:1.3rem;">
+        <button onclick="nextTab('xai')"
+            style="background:#111;color:#f59e0b;font-size:0.85rem;padding:0.65rem 1.8rem;border-radius:35px;border:1px solid #222;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;letter-spacing:0.05em;display:inline-flex;align-items:center;gap:0.5em;box-shadow:0 3px 14px rgba(0,0,0,0.3);outline:none;transition:transform 0.15s,box-shadow 0.2s,border-color 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(0,0,0,0.4)';this.style.borderColor='#f59e0b'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.3)';this.style.borderColor='#222'"
+            onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''">
+            Next Step: XAI Analysis
+            <svg viewBox="0 0 24 24" width="13" height="13"
+                style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+                <polyline points="9 18 15 12 9 6" />
+            </svg>
+        </button>
+    </div>
+
 </div><!-- /panel-carbon -->
+
+<!-- ════════════════════════════════════════
+     CARBON AUTO-PIPELINE CONTROLLER
+════════════════════════════════════════ -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        var COLORS = {
+            black_core: '#e74c3c', crack: '#e67e22',
+            finger: '#f1c40f', star_crack: '#9b59b6', thick_line: '#1abc9c'
+        };
+
+        var _pcRunning = false;
+        var _pcHasRun = false;
+
+        /* ── Overlay helpers ── */
+        function pcShowOverlay() {
+            var o = document.getElementById('pc-overlay');
+            o.style.pointerEvents = 'all';
+            o.style.opacity = '1';
+        }
+        function pcHideOverlay(cb) {
+            var o = document.getElementById('pc-overlay');
+            o.style.opacity = '0';
+            o.style.pointerEvents = 'none';
+            setTimeout(function () { if (cb) cb(); }, 600);
+        }
+        function pcSetMain(main, sub) {
+            var t = document.getElementById('pc-status-text');
+            var s = document.getElementById('pc-status-sub');
+            if (t) { t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '_pc_statusIn 0.35s ease both'; t.textContent = main; }
+            if (s) { s.style.animation = 'none'; void s.offsetWidth; s.style.animation = '_pc_statusIn 0.35s 0.08s ease both'; s.textContent = sub; }
+        }
+        function pcSetProgress(pct) {
+            var b = document.getElementById('pc-prog-bar');
+            if (b) b.style.width = pct + '%';
+        }
+
+        /* Step state helpers */
+        function pcActivateStep(n, sub) {
+            var el = document.getElementById('pc-step-' + n);
+            if (el) { el.className = 'pc-step active'; }
+            var icon = document.getElementById('pc-step-' + n + '-icon');
+            if (icon) icon.style.stroke = '#f59e0b';
+            var subEl = document.getElementById('pc-step-' + n + '-sub');
+            if (subEl) subEl.textContent = sub || 'Processing...';
+        }
+        function pcCompleteStep(n, sub) {
+            var el = document.getElementById('pc-step-' + n);
+            if (el) { el.className = 'pc-step done'; }
+            var icon = document.getElementById('pc-step-' + n + '-icon');
+            if (icon) icon.style.stroke = '#22c55e';
+            var subEl = document.getElementById('pc-step-' + n + '-sub');
+            if (subEl) subEl.textContent = sub || 'Done';
+        }
+        function pcResetSteps() {
+            for (var i = 1; i <= 4; i++) {
+                var el = document.getElementById('pc-step-' + i);
+                if (el) el.className = 'pc-step';
+                var icon = document.getElementById('pc-step-' + i + '-icon');
+                if (icon) icon.style.stroke = '#666';
+                var subEl = document.getElementById('pc-step-' + i + '-sub');
+                if (subEl) subEl.textContent = 'Waiting...';
+            }
+        }
+
+        /* ── Populate left panel from state ── */
+        function pcPopulateInputPanel() {
+            var s = window.state || {};
+
+            /* Defect list */
+            var listEl = document.getElementById('pc-defect-list');
+            if (listEl) {
+                var dets = s.detections || [];
+                if (dets.length === 0) {
+                    listEl.innerHTML = '<div style="font-size:0.76rem;color:#555;font-style:italic;">No defects found — panel appears clean.</div>';
+                } else {
+                    var html = '';
+                    dets.forEach(function (d) {
+                        var c = COLORS[d.class_name] || '#888';
+                        var conf = (d.confidence * 100).toFixed(1);
+                        html += '<div class="pc-def-item">' +
+                            '<div class="pc-def-dot" style="background:' + c + '"></div>' +
+                            '<span>' + d.class_name + '</span>' +
+                            '<span class="pc-def-conf">' + conf + '%</span>' +
+                            '</div>';
+                    });
+                    listEl.innerHTML = html;
+                }
+            }
+
+            /* Resolution & filename */
+            var sz = s.imgSize || { width: '--', height: '--' };
+            var resEl = document.getElementById('pc-param-res');
+            if (resEl) resEl.textContent = sz.width + ' x ' + sz.height + ' px';
+            var fileEl = document.getElementById('pc-param-file');
+            if (fileEl) fileEl.textContent = s.filename || 'unknown';
+        }
+
+        /* ── Render results into right panel ── */
+        function pcRenderResult(r) {
+            var container = document.getElementById('pc-result-container');
+            var placeholder = document.getElementById('pc-result-placeholder');
+            var dot = document.getElementById('pc-result-dot');
+
+            if (placeholder) placeholder.style.display = 'none';
+            if (dot) { dot.style.background = '#f59e0b'; dot.style.animation = '_pc_pulse 2.5s ease-in-out infinite'; }
+
+            var html = '';
+
+            /* Metric cards */
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;margin-bottom:1rem;">';
+            html += '<div class="pc-metric" style="background:#0c0c14;border-color:#1a1a24;">';
+            html += '<div class="pc-metric-val" style="color:#f59e0b;">' + r.co2_kg_per_year + '</div>';
+            html += '<div class="pc-metric-lbl" style="color:#888;">CO&#8322; kg / year</div>';
+            html += '</div>';
+            html += '<div class="pc-metric" style="background:#0c0c14;border-color:#1a1a24;">';
+            html += '<div class="pc-metric-val" style="color:#f59e0b;">' + r.total_degradation_pct + '%</div>';
+            html += '<div class="pc-metric-lbl" style="color:#888;">Panel Degradation</div>';
+            html += '</div>';
+            html += '</div>';
+
+            /* Detail rows */
+            var rows = [
+                ['Dominant Defect', r.dominant_defect],
+                ['City', r.city],
+                ['Emission Factor', r.emission_factor],
+                ['Panel Power', r.panel_power_w + ' W'],
+                ['Ambient Temp', r.ambient_temp_c + ' &#176;C'],
+                ['Irradiance', r.irradiance_w_m2 + ' W/m&#178;'],
+                ['Defects Counted', r.num_defects]
+            ];
+            html += '<div style="margin-top:0.5rem;">';
+            rows.forEach(function (pair) {
+                html += '<div class="pc-detail-row" style="border-color:#1a1a24;">';
+                html += '<span class="pc-detail-key" style="color:#666;">' + pair[0] + '</span>';
+                html += '<span class="pc-detail-val" style="color:#ccc;">' + pair[1] + '</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+
+            /* Saved badge */
+            html += '<div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.8rem;font-size:0.72rem;color:#5a9;letter-spacing:0.04em;">';
+            html += '<svg viewBox="0 0 24 24" width="12" height="12" style="stroke:#22c55e;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+            html += 'Results saved to carbon.csv';
+            html += '</div>';
+
+            container.innerHTML = html;
+            container.style.display = 'block';
+            container.style.animation = 'none';
+            void container.offsetWidth;
+            container.style.animation = '_pc_resultReveal 0.5s cubic-bezier(0.22,1,0.36,1) both';
+        }
+
+        /* ── THE AUTO-PIPELINE ── */
+        window.pcAutoRun = async function () {
+            if (_pcRunning) return;
+            if (_pcHasRun) return;   /* Only run once per session */
+            _pcRunning = true;
+
+            /* Populate left panel from detection state */
+            pcPopulateInputPanel();
+
+            /* Reset and show overlay */
+            pcResetSteps();
+            pcSetProgress(0);
+            pcSetMain('Initialising', 'Starting carbon analysis pipeline...');
+            pcShowOverlay();
+
+            await new Promise(function (r) { setTimeout(r, 350); });
+
+            var city = 'Chennai';
+            var temp = 32;
+            var defaults = { power: 380, irr: 900 };
+
+            try {
+                /* ─── STEP 1: Location ─── */
+                pcActivateStep(1, 'Querying geo-location API...');
+                pcSetMain('Detecting Location', 'Using IP-based geolocation...');
+                pcSetProgress(15);
+
+                var geo = await window.api('/api/weather/location');
+                if (geo.success) {
+                    window.state.geoLat = geo.lat;
+                    window.state.geoLon = geo.lon;
+                    city = geo.city || 'Chennai';
+
+                    /* Match city dropdown */
+                    var sel = document.getElementById('carbonCity');
+                    if (sel) {
+                        for (var i = 0; i < sel.options.length; i++) {
+                            if ((geo.city || '').toLowerCase().indexOf(sel.options[i].value.toLowerCase()) !== -1) {
+                                sel.value = sel.options[i].value;
+                                city = sel.options[i].value;
+                                break;
+                            }
+                        }
+                    }
+
+                    pcCompleteStep(1, city + ' (' + geo.lat.toFixed(2) + ', ' + geo.lon.toFixed(2) + ')');
+                    var cityEl = document.getElementById('pc-param-city');
+                    if (cityEl) cityEl.textContent = city;
+
+                    /* Update hidden locCity/locTemp */
+                    var lc = document.getElementById('locCity');
+                    if (lc) lc.textContent = city;
+                } else {
+                    pcCompleteStep(1, 'Fallback: Chennai');
+                }
+
+                pcSetProgress(30);
+
+                /* ─── STEP 2: Temperature ─── */
+                pcActivateStep(2, 'Fetching live temperature data...');
+                pcSetMain('Fetching Temperature', 'Reading from weather API...');
+                pcSetProgress(40);
+
+                if (window.state.geoLat !== null && window.state.geoLon !== null) {
+                    var wth = await window.api('/api/weather/temperature?lat=' + window.state.geoLat + '&lon=' + window.state.geoLon);
+                    if (wth.success) {
+                        temp = Math.round(wth.temperature_c);
+                    }
+                }
+
+                /* Update hidden fields */
+                document.getElementById('carbonTemp').value = temp;
+                var tempEl = document.getElementById('pc-param-temp');
+                if (tempEl) tempEl.textContent = temp + ' \u00B0C';
+                var lt = document.getElementById('locTemp');
+                if (lt) lt.textContent = temp + ' \u00B0C';
+
+                pcCompleteStep(2, temp + ' \u00B0C ambient');
+                pcSetProgress(55);
+
+                /* ─── STEP 3: Predict ─── */
+                pcActivateStep(3, 'Running emission model...');
+                pcSetMain('Predicting Emission', 'Computing CO\u2082 with defect data...');
+                pcSetProgress(65);
+
+                var s = window.state || {};
+                var payload = {
+                    detections: s.detections || [],
+                    image_width: (s.imgSize || {}).width || 640,
+                    image_height: (s.imgSize || {}).height || 640,
+                    city: city,
+                    panel_power: defaults.power,
+                    ambient_temp: temp,
+                    irradiance: defaults.irr,
+                    filename: s.filename || 'unknown'
+                };
+
+                /* Update power/irr display */
+                var pwEl = document.getElementById('pc-param-power');
+                if (pwEl) pwEl.textContent = defaults.power + ' W';
+                var irEl = document.getElementById('pc-param-irr');
+                if (irEl) irEl.textContent = defaults.irr + ' W/m\u00B2';
+
+                var r = await window.apiJSON('/api/carbon/predict', payload);
+
+                if (r.success) {
+                    pcCompleteStep(3, r.co2_kg_per_year + ' kg CO\u2082/year');
+                    pcSetProgress(90);
+
+                    /* Also write to hidden carbonResult for other scripts */
+                    if (window.renderCarbonResult) {
+                        window.renderCarbonResult(r);
+                    }
+
+                    /* ─── STEP 4: Complete ─── */
+                    pcActivateStep(4, 'Preparing display...');
+                    pcSetMain('Analysis Complete', 'Carbon prediction ready');
+                    pcSetProgress(100);
+
+                    await new Promise(function (resolve) { setTimeout(resolve, 600); });
+                    pcCompleteStep(4, 'All steps complete');
+
+                    await new Promise(function (resolve) { setTimeout(resolve, 400); });
+
+                    /* Hide overlay and show results */
+                    pcHideOverlay(function () {
+                        _pcRunning = false;
+                        _pcHasRun = true;
+                        pcRenderResult(r);
+                    });
+
+                } else {
+                    pcCompleteStep(3, 'Error: ' + (r.error || 'Unknown'));
+                    pcSetMain('Prediction Failed', r.error || 'Unknown error');
+                    pcSetProgress(100);
+                    await new Promise(function (resolve) { setTimeout(resolve, 1500); });
+                    pcHideOverlay(function () {
+                        _pcRunning = false;
+                        _pcHasRun = true;
+                        /* Show error in result pane */
+                        var container = document.getElementById('pc-result-container');
+                        var placeholder = document.getElementById('pc-result-placeholder');
+                        if (placeholder) placeholder.style.display = 'none';
+                        container.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' +
+                            '<svg viewBox="0 0 24 24" width="32" height="32" style="stroke:#ef4444;fill:none;stroke-width:2;stroke-linecap:round;display:block;margin:0 auto 0.8rem;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+                            (r.error || 'Prediction failed') + '</div>';
+                        container.style.display = 'block';
+                    });
+                }
+
+            } catch (err) {
+                pcSetMain('Pipeline Error', err.message || 'Connection failed');
+                pcSetProgress(100);
+                await new Promise(function (resolve) { setTimeout(resolve, 1500); });
+                pcHideOverlay(function () {
+                    _pcRunning = false;
+                    _pcHasRun = true;
+                    var container = document.getElementById('pc-result-container');
+                    var placeholder = document.getElementById('pc-result-placeholder');
+                    if (placeholder) placeholder.style.display = 'none';
+                    container.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' +
+                        '<svg viewBox="0 0 24 24" width="32" height="32" style="stroke:#ef4444;fill:none;stroke-width:2;stroke-linecap:round;display:block;margin:0 auto 0.8rem;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+                        (err.message || 'Pipeline error') + '</div>';
+                    container.style.display = 'block';
+                });
+            }
+        };
+
+        /* Allow re-running if user wants */
+        window.pcReset = function () {
+            _pcHasRun = false;
+            _pcRunning = false;
+        };
+
+    });
+</script>

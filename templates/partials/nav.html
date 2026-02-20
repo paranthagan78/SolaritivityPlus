@@ -1,27 +1,364 @@
+<!-- ═══════════════════════════════════════════════
+     SOLAR PV DETECT — NAV PARTIAL
+     Inline CSS only. Functionality unchanged.
+═══════════════════════════════════════════════ -->
+
+<style>
+    /* Keyframes must live in a <style> block since inline styles can't define @keyframes */
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+    @keyframes _navSlideDown {
+        from {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @keyframes _indicatorSlide {
+        from {
+            transform: scaleX(0);
+        }
+
+        to {
+            transform: scaleX(1);
+        }
+    }
+
+    @keyframes _brandPulse {
+
+        0%,
+        100% {
+            filter: drop-shadow(0 0 4px #f59e0b88);
+        }
+
+        50% {
+            filter: drop-shadow(0 0 10px #f59e0bcc);
+        }
+    }
+
+    @keyframes _timerBlink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.4;
+        }
+    }
+
+    @keyframes _tabRipple {
+        from {
+            transform: scale(0);
+            opacity: 0.4;
+        }
+
+        to {
+            transform: scale(2.5);
+            opacity: 0;
+        }
+    }
+
+    @keyframes _underlineGrow {
+        from {
+            width: 0;
+            left: 50%;
+        }
+
+        to {
+            width: 100%;
+            left: 0;
+        }
+    }
+
+    /* Nav shell */
+    nav {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1.5rem;
+        padding: 0 2rem;
+        height: 64px;
+        background: #0a0a0a;
+        border-bottom: 1px solid #1f1f1f;
+        box-shadow: 0 1px 0 #f59e0b22, 0 4px 32px #00000088;
+        animation: _navSlideDown 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+        font-family: 'DM Sans', sans-serif;
+    }
+
+    /* Subtle grid-line texture overlay */
+    nav::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+            linear-gradient(rgba(245, 158, 11, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(245, 158, 11, 0.03) 1px, transparent 1px);
+        background-size: 32px 32px;
+        pointer-events: none;
+    }
+
+    /* ── Brand ── */
+    .nav-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 700;
+        font-size: 1.1rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #ffffff;
+        white-space: nowrap;
+        flex-shrink: 0;
+        cursor: default;
+        user-select: none;
+    }
+
+    .nav-brand svg {
+        animation: _brandPulse 3s ease-in-out infinite;
+        flex-shrink: 0;
+    }
+
+    /* "PV" accent in orange */
+    .nav-brand span.accent {
+        color: #f59e0b;
+    }
+
+    /* ── Tabs wrapper ── */
+    .nav-tabs {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        background: #111111;
+        border: 1px solid #1e1e1e;
+        border-radius: 35px;
+        padding: 4px;
+        position: relative;
+    }
+
+    /* Glider pill — moved by JS */
+    .nav-tabs::after {
+        content: '';
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        height: calc(100% - 8px);
+        border-radius: 35px;
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        box-shadow: 0 0 16px #f59e0b55;
+        transition: left 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+            width 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
+        z-index: 0;
+        /* JS will set --glider-left and --glider-width */
+        left: var(--glider-left, 4px);
+        width: var(--glider-width, 80px);
+    }
+
+    /* ── Individual tab ── */
+    .tab {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 0.35em;
+        padding: 0.45rem 1rem;
+        border: none;
+        border-radius: 35px;
+        background: transparent;
+        color: #888;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 500;
+        letter-spacing: 0.02em;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+            color 0.25s ease,
+            transform 0.15s ease;
+        overflow: hidden;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Ripple pseudo on click */
+    .tab::before {
+        content: '';
+        position: absolute;
+        inset: 50% auto auto 50%;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #ffffff44;
+        transform: scale(0);
+        pointer-events: none;
+    }
+
+    .tab:active::before {
+        animation: _tabRipple 0.45s ease-out forwards;
+    }
+
+    .tab.active {
+        color: #0a0a0a;
+        font-weight: 700;
+        transform: none;
+    }
+
+    .tab:not(.active):hover {
+        color: #cccccc;
+        transform: translateY(-1px);
+    }
+
+    /* emoji in tab */
+    .tab-icon {
+        font-size: 0.9em;
+        line-height: 1;
+        display: inline-block;
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .tab.active .tab-icon {
+        transform: scale(1.18) rotate(-4deg);
+    }
+
+    /* ── Right side ── */
+    .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        flex-shrink: 0;
+    }
+
+    #sessionTimer {
+        font-family: 'Rajdhani', sans-serif;
+        font-weight: 600;
+        font-size: 0.92rem;
+        letter-spacing: 0.12em;
+        color: #f59e0b;
+        animation: _timerBlink 2s ease-in-out infinite;
+        background: #f59e0b11;
+        border: 1px solid #f59e0b33;
+        padding: 0.2rem 0.6rem;
+        border-radius: 35px;
+    }
+
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.4em;
+        padding: 0.42rem 1rem;
+        border: 1px solid #333;
+        border-radius: 35px;
+        background: transparent;
+        color: #888;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 0.82rem;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+        transition:
+            color 0.2s,
+            border-color 0.2s,
+            background 0.2s,
+            transform 0.15s;
+    }
+
+    .logout-btn:hover {
+        color: #ff4d4d;
+        border-color: #ff4d4d44;
+        background: #ff4d4d11;
+        transform: translateY(-1px);
+    }
+
+    .logout-btn:active {
+        transform: translateY(0) scale(0.97);
+    }
+
+    /* ── Responsive collapse ── */
+    @media (max-width: 860px) {
+        .tab span.tab-label {
+            display: none;
+        }
+
+        .tab {
+            padding: 0.45rem 0.7rem;
+        }
+
+        nav {
+            padding: 0 1rem;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .nav-brand {
+            font-size: 0;
+            gap: 0;
+        }
+
+        .nav-brand svg {
+            display: block;
+        }
+
+        #sessionTimer {
+            display: none;
+        }
+    }
+</style>
+
 <nav>
+
+    <!-- ── Brand ── -->
     <div class="nav-brand">
-        <svg width="20" height="20" viewBox="0 0 52 52" fill="none">
-            <rect x="2" y="13" width="48" height="26" rx="3" fill="#1e3a5f" stroke="#f59e0b" stroke-width="2" />
-            <line x1="2" y1="26" x2="50" y2="26" stroke="#f59e0b" stroke-width="1.5" />
-            <line x1="19" y1="13" x2="19" y2="39" stroke="#f59e0b" stroke-width="1.5" />
-            <line x1="36" y1="13" x2="36" y2="39" stroke="#f59e0b" stroke-width="1.5" />
-            <line x1="26" y1="39" x2="26" y2="47" stroke="#f59e0b" stroke-width="1.8" />
-            <line x1="14" y1="47" x2="38" y2="47" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" />
-        </svg>
-        Solar PV Detect
+        <span class="accent">Solaritivity</span>
     </div>
 
-    <div class="nav-tabs">
-        <button class="tab active" onclick="switchTab('detect',this)">🔍 Detect</button>
-        <button class="tab" onclick="switchTab('carbon',this)">🌍 Carbon</button>
-        <button class="tab" onclick="switchTab('xai',this)">🧠 XAI</button>
-        <button class="tab" onclick="switchTab('thermal',this)">🌡 Thermal</button>
-        <button class="tab" onclick="switchTab('summary',this)">📋 Summary</button>
-        <button class="tab" onclick="switchTab('chat',this)">💬 Chat</button>
+    <!-- ── EL/THERMAL TOGGLE (Detect Panel Only) ── -->
+    <div id="modeToggleWrap"
+        style="display: flex; align-items: center; gap: 0.8rem; background: #111; padding: 4px; border-radius: 35px; border: 1px solid #1e1e1e; transition: opacity 0.3s, transform 0.3s; margin-left:1rem;">
+        <div
+            style="position: relative; display: flex; align-items: center; border-radius: 35px; background: #080808; padding: 2px;">
+            <div id="modeGlider"
+                style="position: absolute; left: 2px; top: 2px; height: calc(100% - 4px); width: 44px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); border-radius: 35px; transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 0 10px #f59e0b44; z-index: 1;">
+            </div>
+            <button onclick="window.setDetectMode('el')" id="modeBtnEL"
+                style="position: relative; z-index: 2; border: none; background: transparent; color: #000; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 0.68rem; padding: 0.35rem 0.8rem; cursor: pointer; border-radius: 35px; letter-spacing: 0.05em; transition: color 0.3s;">EL</button>
+            <button onclick="window.setDetectMode('thermal')" id="modeBtnTH"
+                style="position: relative; z-index: 2; border: none; background: transparent; color: #888; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 0.68rem; padding: 0.35rem 0.8rem; cursor: pointer; border-radius: 35px; letter-spacing: 0.05em; transition: color 0.3s;">THERMAL</button>
+        </div>
     </div>
 
+    <!-- ── Tab bar ── -->
+    <div class="nav-tabs" id="navTabs">
+        <button class="tab active" id="tab-detect" onclick="switchTab('detect',this)">
+            <span class="tab-label">Detect</span>
+        </button>
+        <button class="tab" id="tab-carbon" onclick="switchTab('carbon',this)">
+            <span class="tab-label">Carbon</span>
+        </button>
+        <button class="tab" id="tab-xai" onclick="switchTab('xai',this)">
+            <span class="tab-label">XAI</span>
+        </button>
+
+        <button class="tab" id="tab-summary" onclick="switchTab('summary',this)">
+            <span class="tab-label">Summary</span>
+        </button>
+        <button class="tab" id="tab-chat" onclick="switchTab('chat',this)">
+            <span class="tab-label">Chat</span>
+        </button>
+    </div>
+
+    <!-- ── Right ── -->
     <div class="nav-right">
         <span id="sessionTimer"></span>
         <button class="logout-btn" onclick="logout()">⏻ Logout</button>
     </div>
+
 </nav>

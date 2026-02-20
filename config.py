@@ -20,10 +20,11 @@ for _d in [UPLOAD_FOLDER, RESULT_FOLDER, THERMAL_UPLOAD_FOLDER,
     os.makedirs(_d, exist_ok=True)
 
 # ── Model paths ────────────────────────────────────────────────────────────
-YOLO_MODEL_PATH      = os.path.join(BASE_DIR, "model", "best.pt")
-INTEGRITY_MODEL_PATH = os.path.join(BASE_DIR, "model", "integrity_model.pth")
-CARBON_MODEL_PATH    = os.path.join(BASE_DIR, "model", "carbon_model.pkl")
-LABEL_ENCODER_PATH   = os.path.join(BASE_DIR, "model", "label_encoder.pkl")
+YOLO_MODEL_PATH          = os.path.join(BASE_DIR, "model", "best.pt")
+THERMAL_YOLO_MODEL_PATH  = os.path.join(BASE_DIR, "model", "bestthermal.pt")
+INTEGRITY_MODEL_PATH     = os.path.join(BASE_DIR, "model", "integrity_model.pth")
+CARBON_MODEL_PATH        = os.path.join(BASE_DIR, "model", "carbon_model.pkl")
+LABEL_ENCODER_PATH       = os.path.join(BASE_DIR, "model", "label_encoder.pkl")
 
 # ── CSV paths ──────────────────────────────────────────────────────────────
 DETECTIONS_CSV = os.path.join(DATA_FOLDER, "detections.csv")

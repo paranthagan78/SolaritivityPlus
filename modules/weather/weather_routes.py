@@ -20,8 +20,8 @@ def get_location():
             # Fallback for localhost / private IPs
             return jsonify({
                 "success": True,
-                "city": "Chennai", "region": "Tamil Nadu", "country": "India",
-                "lat": 13.0827, "lon": 80.2707,
+                "city": "Thalavapalayam, Karur", "region": "Tamil Nadu", "country": "India",
+                "lat": 11.0630, "lon": 78.0466,
                 "note": "Fallback location (localhost detected)",
             }), 200
         return jsonify({

@@ -1,0 +1,547 @@
+<!-- ══════════════════════════════════════════
+     PANEL: DETECT THERMAL  —  Independent thermal pipeline
+     Cyan/teal theme. Uses /api/thermal/detect.
+══════════════════════════════════════════ -->
+
+<style>
+    @keyframes _td_fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(22px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes _td_dash {
+        0% {
+            stroke-dashoffset: 251;
+        }
+
+        50% {
+            stroke-dashoffset: 63;
+        }
+
+        100% {
+            stroke-dashoffset: 251;
+        }
+    }
+
+    @keyframes _td_pulse {
+
+        0%,
+        100% {
+            box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.45);
+        }
+
+        50% {
+            box-shadow: 0 0 0 9px rgba(6, 182, 212, 0);
+        }
+    }
+
+    @keyframes _td_imgReveal {
+        from {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes _td_statusIn {
+        from {
+            opacity: 0;
+            transform: translateX(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes _td_dotFlash {
+
+        0%,
+        80%,
+        100% {
+            opacity: 0.2;
+        }
+
+        40% {
+            opacity: 1;
+        }
+    }
+
+    @keyframes _td_dropPulse {
+
+        0%,
+        100% {
+            border-color: rgba(6, 182, 212, 0.15);
+        }
+
+        50% {
+            border-color: rgba(6, 182, 212, 0.35);
+        }
+    }
+</style>
+
+<!-- ════════════════════════════════════════
+     FULL-SCREEN OVERLAY (Thermal Detection)
+════════════════════════════════════════ -->
+<div id="td-overlay" style="
+  position:fixed;inset:0;z-index:9999;
+  background:#08080d;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2.2rem;
+  opacity:0;pointer-events:none;
+  transition:opacity 0.55s cubic-bezier(0.22,1,0.36,1);
+">
+    <div style="position:relative;width:100px;height:100px;">
+        <svg viewBox="0 0 116 116" width="100" height="100" style="display:block;">
+            <circle cx="58" cy="58" r="40" fill="none" stroke="#181820" stroke-width="5" />
+            <circle cx="58" cy="58" r="40" fill="none" stroke="#06b6d4" stroke-width="5" stroke-linecap="round"
+                stroke-dasharray="251" stroke-dashoffset="251" transform="rotate(-90 58 58)"
+                style="animation:_td_dash 1.8s ease-in-out infinite;" />
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" width="28" height="28"
+                style="stroke:#06b6d4;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;">
+                <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+            </svg>
+        </div>
+    </div>
+
+    <div style="text-align:center;display:flex;flex-direction:column;align-items:center;gap:0.3rem;">
+        <div id="td-status-text"
+            style="font-family:'Rajdhani',sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#fff;">
+            Running Detection</div>
+        <div id="td-status-sub"
+            style="font-family:'DM Sans',sans-serif;font-size:0.75rem;color:#555;letter-spacing:0.04em;">Processing
+            thermal image...</div>
+    </div>
+
+    <div style="width:280px;height:2px;background:#161620;border-radius:99px;overflow:hidden;">
+        <div id="td-prog-bar"
+            style="height:100%;background:linear-gradient(90deg,#06b6d4,#22d3ee);border-radius:99px;width:0%;transition:width 0.7s cubic-bezier(0.22,1,0.36,1);">
+        </div>
+    </div>
+
+    <!-- Steps -->
+    <div style="display:flex;flex-direction:column;gap:0.55rem;width:320px;margin-top:0.5rem;">
+        <div class="px-step" id="td-step-1"
+            style="display:flex;align-items:center;gap:0.85rem;padding:0.65rem 1.2rem;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid transparent;transition:background 0.4s,border-color 0.4s;">
+            <div
+                style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <svg id="td-step-1-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s;">
+                    <rect x="3" y="3" width="18" height="18" rx="2.5" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                </svg>
+            </div>
+            <div>
+                <div id="td-step-1-label"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;transition:color 0.3s;">
+                    Uploading Image</div>
+                <div id="td-step-1-sub"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
+                </div>
+            </div>
+        </div>
+        <div class="px-step" id="td-step-2"
+            style="display:flex;align-items:center;gap:0.85rem;padding:0.65rem 1.2rem;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid transparent;transition:background 0.4s,border-color 0.4s;">
+            <div
+                style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <svg id="td-step-2-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s;">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+            </div>
+            <div>
+                <div id="td-step-2-label"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;transition:color 0.3s;">
+                    Detecting Defects</div>
+                <div id="td-step-2-sub"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
+                </div>
+            </div>
+        </div>
+        <div class="px-step" id="td-step-3"
+            style="display:flex;align-items:center;gap:0.85rem;padding:0.65rem 1.2rem;border-radius:12px;background:rgba(255,255,255,0.02);border:1px solid transparent;transition:background 0.4s,border-color 0.4s;">
+            <div
+                style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);flex-shrink:0;">
+                <svg id="td-step-3-icon" viewBox="0 0 24 24" width="16" height="16"
+                    style="stroke:#666;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s;">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+            </div>
+            <div>
+                <div id="td-step-3-label"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;transition:color 0.3s;">
+                    Rendering Results</div>
+                <div id="td-step-3-sub"
+                    style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:5px;">
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#06b6d4;animation:_td_dotFlash 1.4s ease-in-out infinite;"></span>
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#06b6d4;animation:_td_dotFlash 1.4s 0.2s ease-in-out infinite;"></span>
+        <span
+            style="display:inline-block;width:4px;height:4px;border-radius:50%;background:#06b6d4;animation:_td_dotFlash 1.4s 0.4s ease-in-out infinite;"></span>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     PANEL BODY
+════════════════════════════════════════ -->
+<div class="panel" id="panel-detect-thermal" style="
+  padding:1.8rem 2rem;
+  background:#000000;
+  min-height:calc(100vh - 64px);
+  font-family:'DM Sans',sans-serif;
+  animation:_td_fadeInUp 0.5s cubic-bezier(0.22,1,0.36,1) both;
+">
+
+    <!-- ── Header ── -->
+    <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.2rem;">
+        <div
+            style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff;">
+            Thermal <span style="color:#06b6d4;">Defect Detection</span>
+        </div>
+        <div
+            style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
+            IR · YOLO Model</div>
+    </div>
+
+    <!-- ── Two-column split ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;min-height:480px;">
+
+        <!-- ╔══════════════════╗ -->
+        <!-- ║  LEFT: UPLOAD    ║ -->
+        <!-- ╚══════════════════╝ -->
+        <div style="background:#000000;border:1px solid #111;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:box-shadow 0.25s;"
+            onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,0.08)'"
+            onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.04)'">
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:1px solid #1a1a24;">
+                <div
+                    style="width:7px;height:7px;border-radius:50%;background:#06b6d4;flex-shrink:0;animation:_td_pulse 2.5s ease-in-out infinite;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Thermal
+                    Image Input</span>
+            </div>
+
+            <div
+                style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem;gap:1rem;">
+
+                <!-- Drop zone -->
+                <div id="td-dz" onclick="document.getElementById('tdFile').click()" style="
+          width:100%;max-width:360px;
+          border:2px dashed rgba(6,182,212,0.2);border-radius:14px;
+          padding:2.5rem 1.5rem;text-align:center;
+          cursor:pointer;transition:border-color 0.3s,background 0.3s;
+          animation:_td_dropPulse 3s ease-in-out infinite;
+        " onmouseover="this.style.borderColor='rgba(6,182,212,0.45)';this.style.background='rgba(6,182,212,0.03)'"
+                    onmouseout="this.style.borderColor='rgba(6,182,212,0.2)';this.style.background='transparent'">
+                    <input type="file" id="tdFile" accept=".png,.jpg,.jpeg,.bmp,.tiff" onchange="window.tdPreview(this)"
+                        style="display:none;" />
+                    <svg viewBox="0 0 24 24" width="36" height="36"
+                        style="stroke:#06b6d4;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;margin:0 auto 0.8rem;display:block;opacity:0.6;">
+                        <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" />
+                    </svg>
+                    <div style="font-size:0.85rem;color:#ccc;font-weight:500;margin-bottom:0.3rem;">Upload Thermal Image
+                    </div>
+                    <div style="font-size:0.72rem;color:#666;letter-spacing:0.04em;">PNG · JPG · BMP · TIFF</div>
+                </div>
+
+                <!-- Preview -->
+                <div id="td-preview"
+                    style="display:none;width:100%;max-width:360px;border-radius:12px;overflow:hidden;border:1px solid #1a1a24;">
+                </div>
+
+                <!-- Detect button -->
+                <button id="tdBtn" disabled onclick="window.tdRunDetect()" style="
+          width:100%;max-width:360px;
+          background:linear-gradient(135deg,#06b6d4,#0891b2);
+          color:#fff;font-size:0.85rem;padding:0.7rem 1.5rem;
+          border-radius:35px;border:none;cursor:pointer;
+          font-family:'DM Sans',sans-serif;font-weight:600;
+          letter-spacing:0.05em;display:inline-flex;align-items:center;justify-content:center;gap:0.5em;
+          box-shadow:0 3px 14px rgba(6,182,212,0.25);
+          opacity:0.4;transition:opacity 0.3s,transform 0.15s,box-shadow 0.2s;
+        " onmouseover="if(!this.disabled){this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(6,182,212,0.35)';}"
+                    onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(6,182,212,0.25)';">
+                    <svg viewBox="0 0 24 24" width="14" height="14"
+                        style="stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    Run Thermal Detection
+                </button>
+
+            </div>
+        </div><!-- /LEFT -->
+
+        <!-- ╔══════════════════╗ -->
+        <!-- ║  RIGHT: RESULTS  ║ -->
+        <!-- ╚══════════════════╝ -->
+        <div style="background:#000000;border:1px solid #111;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.04);transition:box-shadow 0.25s;"
+            onmouseover="this.style.boxShadow='0 6px 28px rgba(0,0,0,0.08)'"
+            onmouseout="this.style.boxShadow='0 2px 12px rgba(0,0,0,0.04)'">
+            <div
+                style="display:flex;align-items:center;gap:0.6rem;padding:0.9rem 1.4rem;border-bottom:1px solid #1a1a24;">
+                <div id="td-result-dot"
+                    style="width:7px;height:7px;border-radius:50%;background:#333;flex-shrink:0;transition:background 0.4s;">
+                </div>
+                <span
+                    style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Detection
+                    Results</span>
+            </div>
+
+            <div
+                style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.2rem;overflow:auto;">
+
+                <div id="td-result-placeholder"
+                    style="display:flex;flex-direction:column;align-items:center;gap:0.75rem;opacity:0.25;text-align:center;">
+                    <svg viewBox="0 0 24 24" width="48" height="48"
+                        style="stroke:#555;fill:none;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round;">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <p
+                        style="font-size:0.76rem;color:#666;letter-spacing:0.1em;text-transform:uppercase;margin:0;font-family:'Rajdhani',sans-serif;font-weight:600;">
+                        Awaiting Detection</p>
+                </div>
+
+                <div id="td-result-container" style="display:none;width:100%;"></div>
+
+            </div>
+        </div><!-- /RIGHT -->
+
+    </div><!-- /split -->
+
+    <!-- Next step -->
+    <div style="display:flex;justify-content:flex-end;margin-top:1.3rem;">
+        <button onclick="window.switchThermalPanel('xai-thermal')"
+            style="background:#111;color:#06b6d4;font-size:0.85rem;padding:0.65rem 1.8rem;border-radius:35px;border:1px solid #222;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;letter-spacing:0.05em;display:inline-flex;align-items:center;gap:0.5em;box-shadow:0 3px 14px rgba(0,0,0,0.3);outline:none;transition:transform 0.15s,box-shadow 0.2s,border-color 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(0,0,0,0.4)';this.style.borderColor='#06b6d4'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.3)';this.style.borderColor='#222'">
+            Next Step: Thermal XAI
+            <svg viewBox="0 0 24 24" width="13" height="13"
+                style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+                <polyline points="9 18 15 12 9 6" />
+            </svg>
+        </button>
+    </div>
+
+</div><!-- /panel-detect-thermal -->
+
+<!-- ════════════════════════════════════════
+     THERMAL DETECT CONTROLLER
+════════════════════════════════════════ -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        'use strict';
+
+        /* ── Overlay helpers ── */
+        function tdShowOverlay() {
+            var o = document.getElementById('td-overlay');
+            o.style.pointerEvents = 'all'; o.style.opacity = '1';
+        }
+        function tdHideOverlay(cb) {
+            var o = document.getElementById('td-overlay');
+            o.style.opacity = '0'; o.style.pointerEvents = 'none';
+            setTimeout(function () { if (cb) cb(); }, 600);
+        }
+        function tdSetMain(main, sub) {
+            var t = document.getElementById('td-status-text');
+            var s = document.getElementById('td-status-sub');
+            if (t) { t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '_td_statusIn 0.35s ease both'; t.textContent = main; }
+            if (s) { s.style.animation = 'none'; void s.offsetWidth; s.style.animation = '_td_statusIn 0.35s 0.08s ease both'; s.textContent = sub; }
+        }
+        function tdSetProgress(pct) {
+            var b = document.getElementById('td-prog-bar');
+            if (b) b.style.width = pct + '%';
+        }
+        function tdActivateStep(n, sub) {
+            var el = document.getElementById('td-step-' + n);
+            if (el) { el.style.background = 'rgba(6,182,212,0.06)'; el.style.borderColor = 'rgba(6,182,212,0.2)'; }
+            var icon = document.getElementById('td-step-' + n + '-icon');
+            if (icon) icon.style.stroke = '#06b6d4';
+            var lbl = document.getElementById('td-step-' + n + '-label');
+            if (lbl) { lbl.style.color = '#fff'; lbl.style.fontWeight = '500'; }
+            var subEl = document.getElementById('td-step-' + n + '-sub');
+            if (subEl) { subEl.textContent = sub || 'Processing...'; subEl.style.color = '#888'; }
+        }
+        function tdCompleteStep(n, sub) {
+            var el = document.getElementById('td-step-' + n);
+            if (el) { el.style.background = 'rgba(34,197,94,0.04)'; el.style.borderColor = 'rgba(34,197,94,0.15)'; }
+            var icon = document.getElementById('td-step-' + n + '-icon');
+            if (icon) icon.style.stroke = '#22c55e';
+            var lbl = document.getElementById('td-step-' + n + '-label');
+            if (lbl) { lbl.style.color = '#22c55e'; }
+            var subEl = document.getElementById('td-step-' + n + '-sub');
+            if (subEl) { subEl.textContent = sub || 'Done'; subEl.style.color = '#5a9'; }
+        }
+
+        /* ── Preview ── */
+        window.tdPreview = function (input) {
+            var s = window.state || {};
+            s.thermalDetectFile = input.files[0];
+            if (!s.thermalDetectFile) return;
+
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var dz = document.getElementById('td-dz');
+                var prev = document.getElementById('td-preview');
+                if (dz) dz.style.display = 'none';
+                if (prev) {
+                    prev.style.display = 'block';
+                    prev.innerHTML = '<img src="' + e.target.result + '" alt="Input" style="max-width:100%;border-radius:8px;object-fit:contain;animation:_td_imgReveal 0.4s ease both;">';
+                }
+            };
+            reader.readAsDataURL(s.thermalDetectFile);
+
+            var btn = document.getElementById('tdBtn');
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        };
+
+        /* ── Run detection ── */
+        window.tdRunDetect = async function () {
+            var s = window.state || {};
+            if (!s.thermalDetectFile) return;
+
+            tdSetProgress(0);
+            tdSetMain('Uploading Image', 'Sending thermal image to server...');
+            tdActivateStep(1, 'Sending to server...');
+            tdShowOverlay();
+
+            await new Promise(function (r) { setTimeout(r, 350); });
+
+            var fd = new FormData();
+            fd.append('image', s.thermalDetectFile);
+
+            try {
+                tdCompleteStep(1, 'Image received');
+                tdSetProgress(30);
+
+                tdActivateStep(2, 'Running YOLO thermal model...');
+                tdSetMain('Detecting Defects', 'Running thermal YOLO model...');
+                tdSetProgress(45);
+
+                var r = await window.apiForm('/api/thermal/detect', fd);
+
+                if (r.success) {
+                    s.thermalDetections = r.detections;
+                    s.thermalFilename = r.filename;
+                    s.thermalImgSize = r.image_size;
+
+                    tdCompleteStep(2, r.count + ' defect(s) found');
+                    tdSetProgress(80);
+
+                    tdActivateStep(3, 'Building result display...');
+                    tdSetMain('Rendering Results', 'Preparing output...');
+                    tdSetProgress(95);
+
+                    await new Promise(function (res) { setTimeout(res, 500); });
+                    tdCompleteStep(3, 'Complete');
+                    tdSetProgress(100);
+
+                    await new Promise(function (res) { setTimeout(res, 400); });
+
+                    tdHideOverlay(function () {
+                        tdRenderResult(r);
+                    });
+
+                } else {
+                    tdSetMain('Detection Failed', r.error || 'Unknown error');
+                    tdSetProgress(100);
+                    await new Promise(function (res) { setTimeout(res, 1500); });
+                    tdHideOverlay(function () {
+                        tdRenderError(r.error || 'Detection failed');
+                    });
+                }
+
+            } catch (err) {
+                tdSetMain('Pipeline Error', err.message || 'Connection failed');
+                tdSetProgress(100);
+                await new Promise(function (res) { setTimeout(res, 1500); });
+                tdHideOverlay(function () {
+                    tdRenderError(err.message || 'Pipeline error');
+                });
+            }
+        };
+
+        /* ── Render results ── */
+        function tdRenderResult(r) {
+            var container = document.getElementById('td-result-container');
+            var placeholder = document.getElementById('td-result-placeholder');
+            var dot = document.getElementById('td-result-dot');
+
+            if (placeholder) placeholder.style.display = 'none';
+            if (dot) { dot.style.background = '#06b6d4'; dot.style.animation = '_td_pulse 2.5s ease-in-out infinite'; }
+
+            var html = '';
+
+            /* Result image */
+            html += '<div style="width:100%;border-radius:10px;overflow:hidden;margin-bottom:1rem;border:1px solid #1a1a24;">';
+            html += '<img src="' + r.result_image + '?t=' + Date.now() + '" alt="Detection result" style="width:100%;display:block;animation:_td_imgReveal 0.5s ease both;">';
+            html += '</div>';
+
+            /* Stats */
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;margin-bottom:0.8rem;">';
+            html += '<div style="text-align:center;padding:0.7rem;background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;">';
+            html += '<div style="font-family:\'Rajdhani\',sans-serif;font-size:1.3rem;font-weight:700;color:#06b6d4;">' + r.count + '</div>';
+            html += '<div style="font-family:\'Rajdhani\',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#888;">Defects Found</div>';
+            html += '</div>';
+            html += '<div style="text-align:center;padding:0.7rem;background:#0c0c14;border:1px solid #1a1a24;border-radius:10px;">';
+            html += '<div style="font-family:\'Rajdhani\',sans-serif;font-size:1.3rem;font-weight:700;color:#06b6d4;">' + r.image_size.width + 'x' + r.image_size.height + '</div>';
+            html += '<div style="font-family:\'Rajdhani\',sans-serif;font-size:0.65rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#888;">Resolution</div>';
+            html += '</div>';
+            html += '</div>';
+
+            /* Defect list */
+            if (r.detections && r.detections.length > 0) {
+                html += '<div style="display:flex;flex-direction:column;gap:0.35rem;">';
+                r.detections.forEach(function (d) {
+                    var conf = (d.confidence * 100).toFixed(1);
+                    html += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.6rem;background:#0c0c14;border:1px solid #1a1a24;border-radius:8px;font-size:0.76rem;color:#ccc;">';
+                    html += '<div style="width:7px;height:7px;border-radius:50%;background:#06b6d4;flex-shrink:0;"></div>';
+                    html += '<span>' + d.class_name + '</span>';
+                    html += '<span style="margin-left:auto;font-size:0.68rem;color:#888;font-family:\'Rajdhani\',sans-serif;font-weight:600;">' + conf + '%</span>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+            container.style.display = 'block';
+            container.style.animation = '_td_imgReveal 0.5s cubic-bezier(0.22,1,0.36,1) both';
+        }
+
+        function tdRenderError(msg) {
+            var container = document.getElementById('td-result-container');
+            var placeholder = document.getElementById('td-result-placeholder');
+            if (placeholder) placeholder.style.display = 'none';
+            container.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' +
+                '<svg viewBox="0 0 24 24" width="32" height="32" style="stroke:#ef4444;fill:none;stroke-width:2;stroke-linecap:round;display:block;margin:0 auto 0.8rem;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+                msg + '</div>';
+            container.style.display = 'block';
+        }
+
+    });
+</script>
