@@ -12,16 +12,132 @@
         chatHistory: [],
         geoLat: null,
         geoLon: null,
+        // Thermal extension
+        thermalDetectFile: null,
+        thermalDetections: [],
+        thermalFilename: null,
+        thermalImgSize: { width: 640, height: 640 },
+        currentDetectMode: 'el', // 'el' or 'thermal'
     };
+    window.state = state;
 
     // ── Tab switching ────────────────────────────────────────────────────────────
+    function positionGlider() {
+        const tabs = document.getElementById('navTabs');
+        if (!tabs) return;
+        const active = tabs.querySelector('.tab.active');
+        if (!active) return;
+        const tabsRect = tabs.getBoundingClientRect();
+        const activeRect = active.getBoundingClientRect();
+        const offset = activeRect.left - tabsRect.left;
+        tabs.style.setProperty('--glider-left', offset + 'px');
+        tabs.style.setProperty('--glider-width', activeRect.width + 'px');
+    }
+
     function switchTab(name, btn) {
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('panel-' + name).classList.add('active');
+
+        let targetId = 'panel-' + name;
+        // Mode-aware panel selection
+        if (name === 'detect' && state.currentDetectMode === 'thermal') targetId = 'panel-detect-thermal';
+        if (name === 'xai' && state.currentDetectMode === 'thermal') targetId = 'panel-xai-thermal';
+
+        const targetPanel = document.getElementById(targetId);
+        if (targetPanel) targetPanel.classList.add('active');
+
         btn.classList.add('active');
-        if (name === 'carbon' && state.geoLat === null) fetchWeather();
+
+        // Reposition navbar glider
+        requestAnimationFrame(positionGlider);
+
+        // Toggle visibility of mode switcher (only on Detect tab)
+        const modeToggle = document.getElementById('modeToggleWrap');
+        if (modeToggle) {
+            if (name === 'detect') {
+                modeToggle.style.opacity = '1';
+                modeToggle.style.pointerEvents = 'all';
+                modeToggle.style.transform = 'translateX(0)';
+            } else {
+                modeToggle.style.opacity = '0';
+                modeToggle.style.pointerEvents = 'none';
+                modeToggle.style.transform = 'translateX(-10px)';
+            }
+        }
+
+        if (name === 'carbon' && typeof window.pcAutoRun === 'function') window.pcAutoRun();
+        if (name === 'xai') {
+            if (state.currentDetectMode === 'el' && typeof window.pxAutoRun === 'function') window.pxAutoRun();
+            if (state.currentDetectMode === 'thermal' && typeof window.txAutoRun === 'function') window.txAutoRun();
+        }
     }
+
+    // Initialize glider on load
+    window.addEventListener('load', () => { setTimeout(positionGlider, 100); });
+    window.addEventListener('resize', positionGlider);
+
+    // ── Mode Switching ──────────────────────────────────────────────────────────
+    window.setDetectMode = function (mode) {
+        state.currentDetectMode = mode;
+        const glider = document.getElementById('modeGlider');
+        const btnEL = document.getElementById('modeBtnEL');
+        const btnTH = document.getElementById('modeBtnTH');
+
+        if (!glider) return;
+
+        if (mode === 'el') {
+            glider.style.left = '2px';
+            glider.style.width = '38px';
+            btnEL.style.color = '#000';
+            btnTH.style.color = '#888';
+
+            // Show all tabs
+            ['carbon', 'summary', 'chat'].forEach(id => {
+                const el = document.getElementById('tab-' + id);
+                if (el) el.style.display = 'flex';
+            });
+        } else {
+            glider.style.left = '42px';
+            glider.style.width = '78px';
+            btnEL.style.color = '#888';
+            btnTH.style.color = '#000';
+
+            // Hide specific tabs for Thermal mode
+            ['carbon', 'summary', 'chat'].forEach(id => {
+                const el = document.getElementById('tab-' + id);
+                if (el) el.style.display = 'none';
+            });
+
+            // If an active tab is now hidden, switch to detect
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab && activeTab.style.display === 'none') {
+                const detectBtn = document.getElementById('tab-detect');
+                if (detectBtn) switchTab('detect', detectBtn);
+            }
+        }
+
+        // If on detect tab, swap panels immediately
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab && (activeTab.id === 'tab-detect' || activeTab.textContent.trim().toLowerCase() === 'detect')) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            const targetId = (mode === 'el') ? 'panel-detect' : 'panel-detect-thermal';
+            const targetPanel = document.getElementById(targetId);
+            if (targetPanel) targetPanel.classList.add('active');
+        }
+
+        // Force glider reposition after layout change
+        setTimeout(positionGlider, 50);
+    }
+
+
+    window.switchThermalPanel = function (name) {
+        // Find the pseudo-tab and click it
+        let tabName = name;
+        if (name === 'detect-thermal') tabName = 'detect';
+        if (name === 'xai-thermal') tabName = 'xai';
+        const btn = document.querySelector(`.tab[onclick*="'${tabName}'"]`);
+        if (btn) btn.click();
+    };
 
     function nextTab(target) {
         const btn = document.querySelector(`.tab[onclick="switchTab('${target}',this)"]`);
@@ -324,30 +440,255 @@
     }
 
     // ── SUMMARY ───────────────────────────────────────────────────────────────────
+    let _lastSummaryText = '';
+
     async function runSummary() {
-        const filter = document.getElementById('summaryFilter').value.trim();
-        setStatus('summaryStatus', '⏳ Loading local model and generating summary… (30–60s on first run)', 'wa');
-        document.getElementById('summaryBox').textContent = '';
+        const hero = document.getElementById('summaryHero');
+        const overlay = document.getElementById('summaryOverlay');
+        const report = document.getElementById('summaryReport');
+        const nextBtn = document.getElementById('summaryNextBtn');
+
+        // Show overlay
+        hero.style.display = 'none';
+        report.style.display = 'none';
+        nextBtn.style.display = 'none';
+        overlay.style.display = 'flex';
+
         try {
-            const r = await apiJSON('/api/summary/generate', { filename: filter || null });
-            document.getElementById('summaryStatus').innerHTML = '';
+            const r = await apiJSON('/api/summary/generate', {});
+            overlay.style.display = 'none';
             if (r.success) {
-                document.getElementById('summaryBox').textContent = r.summary;
+                _lastSummaryText = r.summary;
+                renderReport(r.summary);
+                report.style.display = 'block';
+                nextBtn.style.display = 'flex';
             } else {
-                setStatus('summaryStatus', r.error, 'er');
-                document.getElementById('summaryBox').textContent = 'Generation failed. See error above.';
+                hero.style.display = 'flex';
+                showToast(r.error || 'Generation failed', 'er');
             }
-        } catch (e) { setStatus('summaryStatus', e.message, 'er'); }
+        } catch (e) {
+            overlay.style.display = 'none';
+            hero.style.display = 'flex';
+            showToast(e.message, 'er');
+        }
     }
 
+    function regenerateSummary() {
+        const report = document.getElementById('summaryReport');
+        const nextBtn = document.getElementById('summaryNextBtn');
+        report.style.display = 'none';
+        nextBtn.style.display = 'none';
+        runSummary();
+    }
+
+    function renderReport(text) {
+        const container = document.getElementById('reportSections');
+        container.innerHTML = parseReportToHTML(text);
+    }
+
+    function parseReportToHTML(raw) {
+        // Clean up raw text
+        let text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        // Remove the ====== header/footer markers
+        text = text.replace(/^={3,}.*$/gm, '');
+        text = text.replace(/^-{3,}\s*$/gm, '');
+
+        // Split into sections: "SECTION N:" pattern
+        const sectionPattern = /(?:^|\n)\s*(?:SECTION\s+\d+\s*:\s*)(.*)/gi;
+        const sectionHeaders = [];
+        let match;
+        while ((match = sectionPattern.exec(text)) !== null) {
+            sectionHeaders.push({ index: match.index, title: match[1].trim() });
+        }
+
+        // If no sections found, render as a single block
+        if (sectionHeaders.length === 0) {
+            return `<div class="report-section">${formatBlock(text)}</div>`;
+        }
+
+        let html = '';
+
+        // Grab any content before the first section (report title, etc.)
+        const preamble = text.substring(0, sectionHeaders[0].index).trim();
+        if (preamble && preamble.replace(/[\s=\-]/g, '').length > 10) {
+            html += `<div class="report-section"><h2>Report Overview</h2>${formatBlock(preamble)}</div>`;
+        }
+
+        // Render each section
+        for (let i = 0; i < sectionHeaders.length; i++) {
+            const startMatch = text.indexOf('\n', sectionHeaders[i].index + 1);
+            const start = startMatch !== -1 ? startMatch : sectionHeaders[i].index;
+            const end = i + 1 < sectionHeaders.length ? sectionHeaders[i + 1].index : text.length;
+            const body = text.substring(start, end).trim();
+            const title = sectionHeaders[i].title
+                .replace(/^SECTION\s+\d+\s*:\s*/i, '')
+                .replace(/[=\-]+$/g, '')
+                .trim();
+            html += `<div class="report-section"><h2>${escHtml(title)}</h2>${formatBlock(body)}</div>`;
+        }
+
+        // Check for END OF REPORT — omit any trailing content
+        return html;
+    }
+
+    function formatBlock(block) {
+        const lines = block.split('\n');
+        let html = '';
+        let inList = false;
+        let inDefectBlock = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            const trimmed = line.trim();
+
+            // Skip empty lines or pure separator lines
+            if (!trimmed || /^[=\-]{3,}$/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                continue;
+            }
+
+            // Skip "SOLAR PANEL INSPECTION REPORT" or "Image Reference:" lines or "END OF REPORT"
+            if (/^(SOLAR PANEL INSPECTION REPORT|Image Reference:|END OF REPORT|Rules:)/i.test(trimmed)) continue;
+
+            // Defect block start/end
+            if (/^\[DEFECT BLOCK (START|END)\]/i.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (trimmed.includes('START')) {
+                    html += '<div class="defect-block">';
+                    inDefectBlock = true;
+                } else {
+                    html += '</div>';
+                    inDefectBlock = false;
+                }
+                continue;
+            }
+
+            // Sub-headings inside sections (e.g., "4a.", "Defect Name:", "Root Causes:", etc.)
+            if (/^(?:\d+[a-z]?[\.\)]\s+|(?:Defect Name|What This Defect Is|Detection Evidence|Root Causes|Consequences|Defect Priority|Immediate Actions|Short-Term Actions|Preventive|Carbon Emission Reduction|Risk Level|Risk Justification|CO2 Emission|Power and Efficiency|Operational and Financial)\b)/i.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h3>${inlineFormat(trimmed)}</h3>`;
+                continue;
+            }
+
+            // Field labels inside defect blocks (e.g., "- Number of detections:")
+            if (inDefectBlock && /^[A-Z][A-Za-z\s]+:$/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<div class="field-label">${escHtml(trimmed)}</div>`;
+                continue;
+            }
+
+            // List items starting with - 
+            if (/^\s*[-•]\s+/.test(line)) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                const content = trimmed.replace(/^[-•]\s+/, '');
+                html += `<li>${inlineFormat(content)}</li>`;
+                continue;
+            }
+
+            // Regular paragraph line
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<p>${inlineFormat(trimmed)}</p>`;
+        }
+
+        if (inList) html += '</ul>';
+        if (inDefectBlock) html += '</div>';
+        return html;
+    }
+
+    function inlineFormat(text) {
+        let s = escHtml(text);
+        // Bold: **text** or __text__
+        s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        // Italic: *text* or _text_
+        s = s.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
+        s = s.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
+        return s;
+    }
+
+    function escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // ── INGEST ──────────────────────────────────────────────────────────────────
     async function runIngest() {
-        setStatus('summaryStatus', '🔄 Re-ingesting documents and CSV data into ChromaDB…', 'wa');
+        const btn = document.getElementById('ingestBtn');
+        const btn2 = document.getElementById('ingestBtn2');
+        const origHTML = btn ? btn.innerHTML : '';
+        const origHTML2 = btn2 ? btn2.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="pill-spinner"></span><span class="pill-text">Ingesting…</span>'; }
+        if (btn2) { btn2.disabled = true; btn2.innerHTML = '<span class="pill-spinner"></span><span class="pill-text">…</span>'; }
+
         try {
             const r = await apiJSON('/api/chat/ingest', {});
-            setStatus('summaryStatus',
-                r.success ? '✓ Ingestion complete. ChromaDB updated.' : r.error,
+            showToast(r.success ? '✓ Data ingested into ChromaDB successfully' : (r.error || 'Ingestion failed'),
                 r.success ? 'ok' : 'er');
-        } catch (e) { setStatus('summaryStatus', e.message, 'er'); }
+        } catch (e) {
+            showToast(e.message, 'er');
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = origHTML; }
+        if (btn2) { btn2.disabled = false; btn2.innerHTML = origHTML2; }
+    }
+
+    // ── PDF ──────────────────────────────────────────────────────────────────────
+    function showPdfModal() {
+        if (!_lastSummaryText) {
+            showToast('Generate a summary first before exporting PDF', 'er');
+            return;
+        }
+        document.getElementById('pdfModal').style.display = 'flex';
+        document.getElementById('pdfFilenameInput').focus();
+    }
+
+    function closePdfModal() {
+        document.getElementById('pdfModal').style.display = 'none';
+    }
+
+    async function downloadPDF() {
+        const filename = document.getElementById('pdfFilenameInput').value.trim() || 'SolarPV_Report';
+        closePdfModal();
+        showToast('⏳ Generating PDF…', 'ok');
+
+        try {
+            const resp = await fetch('/api/summary/pdf', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ summary: _lastSummaryText, filename: filename }),
+            });
+            if (resp.status === 401) { location.href = '/'; return; }
+            if (!resp.ok) {
+                const err = await resp.json();
+                showToast(err.error || 'PDF generation failed', 'er');
+                return;
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename.endsWith('.pdf') ? filename : filename + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showToast('✓ PDF downloaded successfully', 'ok');
+        } catch (e) {
+            showToast('PDF error: ' + e.message, 'er');
+        }
+    }
+
+    // ── Toast ────────────────────────────────────────────────────────────────────
+    function showToast(msg, type) {
+        const toast = document.getElementById('summaryToast');
+        toast.textContent = msg;
+        toast.className = `summary-toast toast-${type}`;
+        toast.style.display = 'block';
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => { toast.style.display = 'none'; }, 4000);
     }
 
     // ── CHAT ─────────────────────────────────────────────────────────────────────

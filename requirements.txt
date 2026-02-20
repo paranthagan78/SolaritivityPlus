@@ -40,3 +40,4 @@ pypdf>=4.0.0
 sentence-transformers==2.6.0
 transformers==4.35.2
 ctransformers>=0.2.27
+reportlab>=4.0.0
