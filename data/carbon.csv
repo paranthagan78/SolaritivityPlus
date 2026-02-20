@@ -31,3 +31,4 @@ timestamp,image_filename,city,panel_power_w,ambient_temp_c,irradiance_w_m2,emiss
 2026-02-20T18:56:50.865377,59cbb8a88822463dbbba1d8fd2b025db.jpg,"Thalavapalayam, Karur",380.0,31.0,900.0,0.8,5,finger,0.7,6.6
 2026-02-20T19:18:38.842609,cea2b4f521264f61a3547a726e0e3bea.jpg,"Thalavapalayam, Karur",380.0,30.0,900.0,0.8,1,finger,0.19,1.62
 2026-02-20T19:22:50.583742,5952fedc7f65417c95407d6b6e4ffff2.jpg,"Thalavapalayam, Karur",380.0,30.0,900.0,0.8,1,black_core,40.0,200.87
+2026-02-20T19:31:28.444065,5d88f82edace48b99e865d4cd2d01ec4.jpg,"Thalavapalayam, Karur",380.0,29.0,900.0,0.8,1,black_core,32.33,167.07
