@@ -1,0 +1,29 @@
+<!-- ══════════════════════════════════════════
+     PANEL: CHAT
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-chat">
+    <div class="card">
+        <div class="card-title">
+            💬 RAG Chatbot
+            <small>(local LLM + ChromaDB · domain docs + CSV data)</small>
+        </div>
+
+        <div style="font-size:.75rem;color:var(--mu);margin-bottom:.75rem;line-height:1.5">
+            Ask anything about solar PV defects, inspection results, or carbon emissions.
+            Answers are grounded in your uploaded documents and real inspection CSV data.
+            <strong style="color:var(--a)">First message loads the model (~30s).</strong>
+        </div>
+
+        <div class="chat-box" id="chatBox">
+            <div class="msg bot">Hello! I'm your Solar PV assistant powered by a local AI model.
+                Ask me about defects, carbon emissions, or your inspection results.</div>
+        </div>
+
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" placeholder="Type your question and press Enter…"
+                onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}" />
+            <button class="btn btn-primary" onclick="sendChat()">Send</button>
+            <button class="btn btn-ghost" onclick="clearChat()">Clear</button>
+        </div>
+    </div>
+</div><!-- /panel-chat -->

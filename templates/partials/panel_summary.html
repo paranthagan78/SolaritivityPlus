@@ -1,0 +1,33 @@
+<!-- ══════════════════════════════════════════
+     PANEL: SUMMARY
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-summary">
+    <div class="card">
+        <div class="card-title">
+            📋 AI Report Summary
+            <small>(local LLM — orca-mini-3b)</small>
+        </div>
+
+        <div style="display:flex;gap:.65rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:.9rem">
+            <div class="form-group" style="flex:1;min-width:200px;margin:0">
+                <label>Filter by image filename (optional — leave blank for all records)</label>
+                <input type="text" id="summaryFilter" placeholder="e.g. abc123" />
+            </div>
+            <button class="btn btn-primary" onclick="runSummary()">Generate Summary</button>
+            <button class="btn btn-secondary" onclick="runIngest()" title="Re-embed docs + CSVs into ChromaDB">
+                🔄 Re-ingest Data
+            </button>
+        </div>
+
+        <div id="summaryStatus" style="margin-bottom:.65rem"></div>
+
+        <div class="summary-box" id="summaryBox">Summary will appear here after generation.
+
+            ⏳ Note: First generation may take 30–60 seconds while the local model loads into memory.</div>
+    </div>
+
+    <!-- Next Step Button -->
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="btn btn-primary" onclick="nextTab('chat')">Next Step: Chat Assistant ➡</button>
+    </div>
+</div><!-- /panel-summary -->

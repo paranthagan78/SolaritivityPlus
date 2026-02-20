@@ -1,0 +1,71 @@
+<!-- ══════════════════════════════════════════
+     PANEL: DETECT
+══════════════════════════════════════════ -->
+<div class="panel active" id="panel-detect">
+    <div class="grid2">
+
+        <!-- Left: upload + controls -->
+        <div class="card">
+            <div class="card-title">🔍 EL Image — Defect Detection</div>
+
+            <div class="drop-zone" id="dz" onclick="document.getElementById('detectFile').click()"
+                ondragover="dzDrag(event,true)" ondragleave="dzDrag(event,false)" ondrop="dzDrop(event)">
+                <input type="file" id="detectFile" accept=".png,.jpg,.jpeg,.bmp" onchange="previewDetect(this)" />
+                <div>Drop EL image here or <strong style="color:var(--a)">click to browse</strong></div>
+                <div class="drop-hint">PNG · JPG · BMP · up to 50 MB</div>
+            </div>
+
+            <div id="detectPreview" style="margin-top:.75rem"></div>
+
+            <div class="divider"></div>
+
+            <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap">
+                <button class="btn btn-ghost btn-sm" id="integrityBtn" onclick="runIntegrity()" disabled>
+                    🛡 Check Integrity
+                </button>
+                <span id="integrityResult"></span>
+            </div>
+
+            <button class="btn btn-primary btn-full" id="detectBtn" style="margin-top:.72rem" onclick="runDetect()"
+                disabled>
+                Run YOLO Detection
+            </button>
+        </div>
+
+        <!-- Right: result -->
+        <div class="card">
+            <div class="card-title">📊 Detection Result</div>
+            <div id="detectResult" style="color:var(--mu);font-size:.82rem;text-align:center;padding:2.5rem 1rem">
+                Upload an EL image and run detection to see results here.
+            </div>
+        </div>
+
+    </div><!-- /grid2 -->
+
+    <!-- Detection table -->
+    <div class="card" id="detectionsTableCard" style="display:none;margin-top:1rem">
+        <div class="card-title">🗂 Detection Table
+            <span style="margin-left:auto">
+                <span id="csvSavedBadge" class="badge badge-ok" style="display:none">✓ Saved to CSV</span>
+            </span>
+        </div>
+        <div style="overflow-x:auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Class</th>
+                        <th>Confidence</th>
+                        <th>Bounding Box (x1,y1,x2,y2)</th>
+                        <th>Area Ratio</th>
+                    </tr>
+                </thead>
+                <tbody id="detectionsBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Next Step Button -->
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="btn btn-primary" onclick="nextTab('carbon')">Next Step: Carbon Prediction ➡</button>
+    </div>
+</div><!-- /panel-detect -->

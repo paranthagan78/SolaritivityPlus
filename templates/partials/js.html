@@ -1,0 +1,451 @@
+<script>
+    'use strict';
+
+    // ── App state ────────────────────────────────────────────────────────────────
+    const state = {
+        detectFile: null,
+        xaiFile: null,
+        thermalFile: null,
+        detections: [],
+        filename: null,
+        imgSize: { width: 640, height: 640 },
+        chatHistory: [],
+        geoLat: null,
+        geoLon: null,
+    };
+
+    // ── Tab switching ────────────────────────────────────────────────────────────
+    function switchTab(name, btn) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('panel-' + name).classList.add('active');
+        btn.classList.add('active');
+        if (name === 'carbon' && state.geoLat === null) fetchWeather();
+    }
+
+    function nextTab(target) {
+        const btn = document.querySelector(`.tab[onclick="switchTab('${target}',this)"]`);
+        if (btn) btn.click();
+    }
+
+    // ── Session timer ────────────────────────────────────────────────────────────
+    (async () => {
+        try {
+            const d = await api('/api/auth/status');
+            if (!d.authenticated) { location.href = '/'; return; }
+            let rem = d.session_remaining || 3600;
+            const el = document.getElementById('sessionTimer');
+            const tick = () => {
+                if (rem <= 0) { location.href = '/'; return; }
+                const m = Math.floor(rem / 60), s = rem % 60;
+                el.textContent = `⏱ ${m}:${String(s).padStart(2, '0')}`;
+                rem--;
+            };
+            tick();
+            setInterval(tick, 1000);
+        } catch (e) { location.href = '/'; }
+    })();
+
+    async function logout() {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        location.href = '/';
+    }
+
+    // ── Weather / geo auto-fill ──────────────────────────────────────────────────
+    async function fetchWeather() {
+        setText('locCity', '…'); setText('locTemp', '… °C');
+        try {
+            const geo = await api('/api/weather/location');
+            if (!geo.success) throw new Error(geo.error);
+            state.geoLat = geo.lat;
+            state.geoLon = geo.lon;
+            setText('locCity', geo.city || 'Unknown');
+
+            // Match city dropdown
+            const sel = document.getElementById('carbonCity');
+            for (const opt of sel.options) {
+                if ((geo.city || '').toLowerCase().includes(opt.value.toLowerCase())) {
+                    sel.value = opt.value; break;
+                }
+            }
+
+            // Fetch live temperature
+            const wth = await api(`/api/weather/temperature?lat=${geo.lat}&lon=${geo.lon}`);
+            if (wth.success) {
+                const t = Math.round(wth.temperature_c);
+                setText('locTemp', `${t} °C`);
+                document.getElementById('carbonTemp').value = t;
+            }
+        } catch (e) {
+            setText('locCity', 'Unavailable');
+            setText('locTemp', '— °C');
+        }
+    }
+
+    // ── Drag & drop (detect zone) ────────────────────────────────────────────────
+    function dzDrag(e, on) {
+        e.preventDefault();
+        document.getElementById('dz').classList.toggle('over', on);
+    }
+    function dzDrop(e) {
+        e.preventDefault();
+        document.getElementById('dz').classList.remove('over');
+        const f = e.dataTransfer.files[0];
+        if (f) { state.detectFile = f; showPreview('detectPreview', f); toggleDetectBtns(true); }
+    }
+
+    // ── DETECT ───────────────────────────────────────────────────────────────────
+    function previewDetect(input) {
+        state.detectFile = input.files[0];
+        if (!state.detectFile) return;
+        showPreview('detectPreview', state.detectFile);
+        toggleDetectBtns(true);
+    }
+
+    function toggleDetectBtns(on) {
+        document.getElementById('detectBtn').disabled = !on;
+        document.getElementById('integrityBtn').disabled = !on;
+    }
+
+    async function runIntegrity() {
+        if (!state.detectFile) return;
+        const fd = new FormData();
+        fd.append('images', state.detectFile);
+        document.getElementById('integrityResult').innerHTML = '<span class="spinner"></span>';
+        try {
+            const r = await apiForm('/api/integrity/check', fd);
+            const res = r.results?.[0];
+            if (res) {
+                const ok = res.valid;
+                const pct = (res.confidence * 100).toFixed(0);
+                document.getElementById('integrityResult').innerHTML =
+                    `<span class="badge ${ok ? 'badge-ok' : 'badge-er'}">${ok ? '✓ Valid' : '✗ Invalid'}%</span>`;
+            }
+        } catch (e) {
+            document.getElementById('integrityResult').innerHTML =
+                '<span class="badge badge-er">Error</span>';
+        }
+    }
+
+    async function runDetect() {
+        if (!state.detectFile) return;
+        const fd = new FormData();
+        fd.append('image', state.detectFile);
+        setEl('detectResult', loadingHtml('Running YOLO detection…'));
+        setDisabled('detectBtn', true);
+        try {
+            const r = await apiForm('/api/detect/run', fd);
+            if (r.success) {
+                state.detections = r.detections;
+                state.filename = r.filename;
+                state.imgSize = r.image_size;
+                renderDetectResult(r);
+                setAlert('carbonNote',
+                    `✓ Detection complete — ${r.count} defect(s) found. Go to Carbon tab to predict emission.`,
+                    'ok');
+            } else {
+                setEl('detectResult', alertHtml(r.error, 'er'));
+            }
+        } catch (e) {
+            setEl('detectResult', alertHtml(e.message, 'er'));
+        }
+        setDisabled('detectBtn', false);
+    }
+
+    const COLORS = {
+        black_core: '#e74c3c', crack: '#e67e22',
+        finger: '#f1c40f', star_crack: '#9b59b6', thick_line: '#1abc9c',
+    };
+
+    function renderDetectResult(r) {
+        const stats = `
+    <div class="grid3" style="margin-bottom:.8rem">
+      <div class="stat">
+        <div class="val">${r.count}</div>
+        <div class="lbl">Defects Found</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="font-size:1rem">${r.image_size.width}×${r.image_size.height}</div>
+        <div class="lbl">Resolution (px)</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="color:${r.count > 0 ? 'var(--er)' : 'var(--ok)'};font-size:1.1rem">
+          ${r.count > 0 ? 'DEFECTIVE' : 'CLEAN'}
+        </div>
+        <div class="lbl">Panel Status</div>
+      </div>
+    </div>`;
+
+        const img = `
+    <div class="img-wrap" style="margin-bottom:.8rem">
+      <img src="${r.result_image}?t=${Date.now()}" alt="Detection result"/>
+    </div>`;
+
+        const list = r.detections.length
+            ? r.detections.map(d => `
+        <div class="det-item">
+          <div class="det-info">
+            <div class="det-dot" style="background:${COLORS[d.class_name] || '#aaa'}"></div>
+            <strong>${d.class_name}</strong>
+          </div>
+          <div class="det-meta">
+            <span class="badge badge-wa">${(d.confidence * 100).toFixed(1)}%</span>
+            <span style="font-size:.69rem;color:var(--mu)">AR ${(d.area_ratio * 100).toFixed(2)}%</span>
+          </div>
+        </div>`).join('')
+            : '<div style="color:var(--ok);font-size:.83rem;padding:.5rem 0">✓ No defects detected — panel appears clean.</div>';
+
+        setEl('detectResult', stats + img + list);
+
+        // Table
+        document.getElementById('detectionsTableCard').style.display = 'block';
+        document.getElementById('csvSavedBadge').style.display = 'inline-block';
+        document.getElementById('detectionsBody').innerHTML = r.detections.length
+            ? r.detections.map(d =>
+                `<tr>
+          <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[d.class_name] || '#aaa'};margin-right:.4rem"></span>${d.class_name}</td>
+          <td>${(d.confidence * 100).toFixed(2)}%</td>
+          <td style="font-family:monospace;font-size:.72rem">${d.bbox.join(', ')}</td>
+          <td>${(d.area_ratio * 100).toFixed(3)}%</td>
+        </tr>`).join('')
+            : '<tr><td colspan="4" style="color:var(--ok);text-align:center">No defects</td></tr>';
+    }
+
+    // ── CARBON ───────────────────────────────────────────────────────────────────
+    async function runCarbon() {
+        setEl('carbonResult', loadingHtml('Predicting CO₂ emission…'));
+        try {
+            const r = await apiJSON('/api/carbon/predict', {
+                detections: state.detections,
+                image_width: state.imgSize.width,
+                image_height: state.imgSize.height,
+                city: document.getElementById('carbonCity').value,
+                panel_power: +document.getElementById('carbonPower').value,
+                ambient_temp: +document.getElementById('carbonTemp').value,
+                irradiance: +document.getElementById('carbonIrr').value,
+                filename: state.filename || 'unknown',
+            });
+            if (r.success) renderCarbonResult(r);
+            else setEl('carbonResult', alertHtml(r.error, 'er'));
+        } catch (e) { setEl('carbonResult', alertHtml(e.message, 'er')); }
+    }
+
+    function renderCarbonResult(r) {
+        const rows = [
+            ['Dominant Defect', `<strong>${r.dominant_defect}</strong>`],
+            ['City', r.city],
+            ['Emission Factor', r.emission_factor],
+            ['Panel Power', `${r.panel_power_w} W`],
+            ['Ambient Temp', `${r.ambient_temp_c} °C`],
+            ['Irradiance', `${r.irradiance_w_m2} W/m²`],
+            ['Defects Counted', r.num_defects],
+        ].map(([k, v]) =>
+            `<div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--bd)">
+       <span style="color:var(--mu)">${k}</span><span>${v}</span>
+     </div>`).join('');
+
+        setEl('carbonResult', `
+    <div class="grid2" style="margin-bottom:.85rem">
+      <div class="stat">
+        <div class="val">${r.co2_kg_per_year}</div>
+        <div class="lbl">CO₂ kg / year</div>
+      </div>
+      <div class="stat">
+        <div class="val">${r.total_degradation_pct}%</div>
+        <div class="lbl">Panel Degradation</div>
+      </div>
+    </div>
+    <div style="font-size:.8rem">${rows}</div>
+    <div style="font-size:.7rem;color:var(--mu);margin-top:.6rem">✓ Results saved to carbon.csv</div>
+  `);
+    }
+
+    // ── XAI ──────────────────────────────────────────────────────────────────────
+    function previewXAI(input) {
+        state.xaiFile = input.files[0];
+        if (!state.xaiFile) return;
+        showPreview('xaiPreview', state.xaiFile);
+        setDisabled('xaiBtn', false);
+    }
+
+    async function runXAI() {
+        if (!state.xaiFile) return;
+        setEl('xaiResult', loadingHtml('Generating GradCAM heatmap…'));
+        setDisabled('xaiBtn', true);
+        const fd = new FormData();
+        fd.append('image', state.xaiFile);
+        try {
+            const r = await apiForm('/api/xai/gradcam', fd);
+            setEl('xaiResult', r.success
+                ? `<div class="img-wrap" style="margin-bottom:.6rem">
+           <img src="${r.explanation_image}?t=${Date.now()}" alt="GradCAM heatmap"/>
+         </div>
+         <div style="font-size:.72rem;color:var(--mu);text-align:center;line-height:1.5">
+           🔴 Warm regions = high model activation (features driving prediction)<br>
+           🔵 Cool regions = low activation
+         </div>`
+                : alertHtml(r.error, 'er'));
+        } catch (e) { setEl('xaiResult', alertHtml(e.message, 'er')); }
+        setDisabled('xaiBtn', false);
+    }
+
+    // ── THERMAL ───────────────────────────────────────────────────────────────────
+    function previewThermal(input) {
+        state.thermalFile = input.files[0];
+        if (!state.thermalFile) return;
+        showPreview('thermalPreview', state.thermalFile);
+        setDisabled('thermalBtn', false);
+    }
+
+    async function runThermal() {
+        if (!state.thermalFile) return;
+        setEl('thermalResult', loadingHtml('Detecting hotspots…'));
+        setDisabled('thermalBtn', true);
+        const fd = new FormData();
+        fd.append('image', state.thermalFile);
+        try {
+            const r = await apiForm('/api/thermal/predict', fd);
+            if (r.success) {
+                setEl('thermalResult', `
+        <div class="img-wrap" style="margin-bottom:.75rem">
+          <img src="${r.result_image}?t=${Date.now()}" alt="Hotspot overlay"/>
+        </div>
+        <div class="stat">
+          <div class="val">${r.hotspot_count}</div>
+          <div class="lbl">Hotspots Detected</div>
+        </div>
+        ${r.note ? `<div style="font-size:.71rem;color:var(--mu);margin-top:.55rem">${r.note}</div>` : ''}
+      `);
+            } else {
+                setEl('thermalResult', alertHtml(r.error, 'er'));
+            }
+        } catch (e) { setEl('thermalResult', alertHtml(e.message, 'er')); }
+        setDisabled('thermalBtn', false);
+    }
+
+    // ── SUMMARY ───────────────────────────────────────────────────────────────────
+    async function runSummary() {
+        const filter = document.getElementById('summaryFilter').value.trim();
+        setStatus('summaryStatus', '⏳ Loading local model and generating summary… (30–60s on first run)', 'wa');
+        document.getElementById('summaryBox').textContent = '';
+        try {
+            const r = await apiJSON('/api/summary/generate', { filename: filter || null });
+            document.getElementById('summaryStatus').innerHTML = '';
+            if (r.success) {
+                document.getElementById('summaryBox').textContent = r.summary;
+            } else {
+                setStatus('summaryStatus', r.error, 'er');
+                document.getElementById('summaryBox').textContent = 'Generation failed. See error above.';
+            }
+        } catch (e) { setStatus('summaryStatus', e.message, 'er'); }
+    }
+
+    async function runIngest() {
+        setStatus('summaryStatus', '🔄 Re-ingesting documents and CSV data into ChromaDB…', 'wa');
+        try {
+            const r = await apiJSON('/api/chat/ingest', {});
+            setStatus('summaryStatus',
+                r.success ? '✓ Ingestion complete. ChromaDB updated.' : r.error,
+                r.success ? 'ok' : 'er');
+        } catch (e) { setStatus('summaryStatus', e.message, 'er'); }
+    }
+
+    // ── CHAT ─────────────────────────────────────────────────────────────────────
+    async function sendChat() {
+        const input = document.getElementById('chatInput');
+        const q = input.value.trim();
+        if (!q) return;
+        if (!q) return;
+        input.value = '';
+        input.disabled = true;
+
+        appendMsg(q, 'user');
+        state.chatHistory.push({ role: 'user', content: q });
+
+        const thinking = appendMsg('⏳ Thinking… (local model may take 15–30s)', 'bot thinking');
+        try {
+            const r = await apiJSON('/api/chat/query', {
+                question: q,
+                history: state.chatHistory.slice(-8),
+            });
+            const ans = r.success ? r.answer : `Error: ${r.error}`;
+            thinking.className = 'msg bot';
+            thinking.textContent = ans;
+            state.chatHistory.push({ role: 'model', content: ans });
+        } catch (e) {
+            thinking.className = 'msg bot';
+            thinking.textContent = `Error: ${e.message}`;
+        }
+        input.disabled = false;
+        input.focus();
+        scrollChat();
+    }
+
+    function appendMsg(text, cls) {
+        const box = document.getElementById('chatBox');
+        const div = document.createElement('div');
+        div.className = `msg ${cls}`;
+        div.textContent = text;
+        box.appendChild(div);
+        scrollChat();
+        return div;
+    }
+
+    function scrollChat() {
+        const box = document.getElementById('chatBox');
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function clearChat() {
+        state.chatHistory = [];
+        document.getElementById('chatBox').innerHTML =
+            '<div class="msg bot">Chat cleared. What would you like to know?</div>';
+    }
+
+    // ── API helpers ───────────────────────────────────────────────────────────────
+    async function api(url, opts = {}) {
+        opts.credentials = 'include';
+        const r = await fetch(url, opts);
+        if (r.status === 401) { location.href = '/'; throw new Error('Unauthorized'); }
+        return r.json();
+    }
+    async function apiForm(url, fd) { return api(url, { method: 'POST', body: fd }); }
+    async function apiJSON(url, body) {
+        return api(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+    }
+
+    // ── DOM helpers ───────────────────────────────────────────────────────────────
+    function setEl(id, html) { document.getElementById(id).innerHTML = html; }
+    function setText(id, txt) { document.getElementById(id).textContent = txt; }
+    function setDisabled(id, val) { document.getElementById(id).disabled = val; }
+
+    function showPreview(containerId, file) {
+        setEl(containerId,
+            `<div class="img-wrap"><img src="${URL.createObjectURL(file)}" alt="Preview"/></div>`);
+    }
+
+    function loadingHtml(msg) {
+        return `<div style="text-align:center;padding:2.5rem 1rem;color:var(--mu)">
+    <span class="spinner"></span> ${msg}
+  </div>`;
+    }
+
+    function alertHtml(msg, type) {
+        const cls = { ok: 'alert-ok', er: 'alert-er', wa: 'alert-wa' };
+        return `<div class="alert ${cls[type] || ''}">${msg}</div>`;
+    }
+
+    function setStatus(id, msg, type) {
+        setEl(id, alertHtml(msg, type));
+    }
+
+    function setAlert(id, msg, type) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = `alert alert-${type}`;
+    }
+</script>

@@ -1,0 +1,33 @@
+<!-- ══════════════════════════════════════════
+     PANEL: XAI
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-xai">
+    <div class="grid2">
+
+        <div class="card">
+            <div class="card-title">🧠 GradCAM Explainability</div>
+            <div class="drop-zone" onclick="document.getElementById('xaiFile').click()">
+                <input type="file" id="xaiFile" accept=".png,.jpg,.jpeg,.bmp" onchange="previewXAI(this)" />
+                <div>Select EL image for GradCAM analysis</div>
+                <div class="drop-hint">Visualises which regions drove the model's decision</div>
+            </div>
+            <div id="xaiPreview" style="margin-top:.75rem"></div>
+            <button class="btn btn-primary btn-full" id="xaiBtn" style="margin-top:.72rem" onclick="runXAI()" disabled>
+                Generate GradCAM Heatmap
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🔬 Activation Heatmap</div>
+            <div id="xaiResult" style="color:var(--mu);font-size:.82rem;text-align:center;padding:2.5rem 1rem">
+                Heatmap will appear here.
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Next Step Button -->
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="btn btn-primary" onclick="nextTab('thermal')">Next Step: Thermal Inspection ➡</button>
+    </div>
+</div><!-- /panel-xai -->
