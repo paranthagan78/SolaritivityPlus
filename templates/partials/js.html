@@ -223,6 +223,54 @@
         document.getElementById('integrityBtn').disabled = !on;
     }
 
+    window.clearDetectFile = function () {
+        state.detectFile = null;
+        state.filename = null;
+        state.detections = [];
+
+        // Reset UI
+        const dz = document.getElementById('dz');
+        const prev = document.getElementById('detectPreview');
+        const btn = document.getElementById('detectBtn');
+        const res = document.getElementById('pd-result-img-wrap');
+        const ph = document.getElementById('pd-result-placeholder');
+        const dot = document.getElementById('pd-result-dot');
+        const info = document.getElementById('pd-result-info');
+        const table = document.getElementById('detectionsTableCard');
+        const badge = document.getElementById('csvSavedBadge');
+
+        if (dz) dz.style.display = 'flex';
+        if (prev) {
+            prev.style.display = 'none';
+            prev.innerHTML = '';
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.38';
+        }
+
+        // Clear result side
+        if (res) {
+            res.style.display = 'none';
+            res.innerHTML = '';
+        }
+        if (ph) ph.style.display = 'flex';
+        if (dot) {
+            dot.style.background = '#d0d0c8';
+            dot.style.animation = 'none';
+        }
+        if (info) info.style.display = 'none';
+        if (table) table.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+
+        const fileInput = document.getElementById('detectFile');
+        if (fileInput) fileInput.value = '';
+
+        // Clear alert notes
+        const carbonNote = document.getElementById('carbonNote');
+        if (carbonNote) carbonNote.style.display = 'none';
+    };
+
     async function runIntegrity() {
         if (!state.detectFile) return;
         const fd = new FormData();
@@ -692,6 +740,21 @@
     }
 
     // ── CHAT ─────────────────────────────────────────────────────────────────────
+    function toggleChatWindow() {
+        const widget = document.getElementById('chat-widget');
+        widget.classList.toggle('chat-widget-hidden');
+        if (!widget.classList.contains('chat-widget-hidden')) {
+            document.getElementById('chatInput').focus();
+        }
+    }
+
+    function sendQuickChat(question) {
+        document.getElementById('quickQuestions').style.display = 'none';
+        const input = document.getElementById('chatInput');
+        input.value = question;
+        sendChat();
+    }
+
     async function sendChat() {
         const input = document.getElementById('chatInput');
         const q = input.value.trim();
@@ -703,12 +766,23 @@
         appendMsg(q, 'user');
         state.chatHistory.push({ role: 'user', content: q });
 
-        const thinking = appendMsg('⏳ Thinking… (local model may take 15–30s)', 'bot thinking');
+        const thinking = appendMsg('Thinking...', 'bot thinking');
+        document.getElementById('quickQuestions').style.display = 'none'; // hide chips explicitly here too
+
         try {
-            const r = await apiJSON('/api/chat/query', {
+            const payload = {
                 question: q,
                 history: state.chatHistory.slice(-8),
-            });
+            };
+
+            // Contextually inject whichever image the user is currently working on
+            if (state.currentDetectMode === 'el' && state.filename) {
+                payload.image_filename = state.filename;
+            } else if (state.currentDetectMode === 'thermal' && state.thermalFilename) {
+                payload.image_filename = state.thermalFilename;
+            }
+
+            const r = await apiJSON('/api/chat/query', payload);
             const ans = r.success ? r.answer : `Error: ${r.error}`;
             thinking.className = 'msg bot';
             thinking.textContent = ans;

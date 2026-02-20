@@ -213,7 +213,7 @@
                 style="font-family:'DM Sans',sans-serif;font-size:0.8rem;color:#666;max-width:270px;line-height:1.65;">
                 The integrity check failed. Please upload a valid EL image (PNG, JPG, or BMP) and try again.
             </div>
-            <button onclick="pdResetOverlay()"
+            <button onclick="window.clearDetectFile(); pdResetOverlay()"
                 style="margin-top:0.3rem;padding:0.6rem 2rem;border-radius:35px;border:1.5px solid #f59e0b;background:transparent;color:#f59e0b;font-family:'DM Sans',sans-serif;font-weight:600;font-size:0.85rem;letter-spacing:0.06em;cursor:pointer;transition:background 0.2s,color 0.2s;"
                 onmouseover="this.style.background='#f59e0b';this.style.color='#0a0a0a'"
                 onmouseout="this.style.background='transparent';this.style.color='#f59e0b'">Try Again</button>
@@ -241,7 +241,7 @@
         </div>
         <div
             style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
-            YOLO · Neural Pipeline</div>
+            Neural Pipeline</div>
     </div>
 
     <!-- ── Two-column split ── -->
@@ -294,7 +294,7 @@
 
                 <!-- Preview (hidden until upload) -->
                 <div id="detectPreview"
-                    style="flex:1;display:none;align-items:center;justify-content:center;overflow:hidden;border-radius:10px;background:#fafaf8;border:1px solid #eeeee9;">
+                    style="flex:1;display:none;align-items:center;justify-content:center;overflow:hidden;border-radius:10px;background:#000000;border:1px solid #eeeee9;position:relative;">
                 </div>
 
                 <!-- Integrity result (hidden, read by pipeline) -->
@@ -365,7 +365,7 @@
 
                 <!-- Result image wrapper -->
                 <div id="pd-result-img-wrap"
-                    style="width:100%;height:100%;display:none;align-items:center;justify-content:center;">
+                    style="width:95%;height:95%;display:none;align-items:center;justify-content:center;">
                 </div>
 
                 <!-- Original detectResult div (kept for JS, hidden visually) -->
@@ -426,7 +426,7 @@
             onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(0,0,0,0.22)';"
             onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.16)';"
             onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''">
-            Next Step: Carbon Prediction
+            Carbon Prediction
             <svg viewBox="0 0 24 24" width="13" height="13"
                 style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
                 <polyline points="9 18 15 12 9 6" />
@@ -505,7 +505,12 @@
                     if (dz) dz.style.display = 'none';
                     if (prev) {
                         prev.style.display = 'flex';
-                        prev.innerHTML = '<img src="' + e.target.result + '" alt="Input" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;animation:_pd_imgReveal 0.4s ease both;">';
+                        prev.innerHTML = `
+                            <img src="${e.target.result}" alt="Input" style="max-width:100%;max-height:100%;border-radius:8px;object-fit:contain;animation:_pd_imgReveal 0.4s ease both;">
+                            <button onclick="window.clearDetectFile()" title="Delete Image" style="position:absolute;top:10px;right:10px;background:rgba(239,68,68,0.9);color:white;border:none;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:5;transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                                <i class="fa-solid fa-trash-can" style="font-size:0.8rem;"></i>
+                            </button>
+                        `;
                     }
                 };
                 reader.readAsDataURL(input.files[0]);
@@ -643,7 +648,14 @@
 
             var img = sourceEl.querySelector('img');
             if (img) {
-                wrap.innerHTML = '<img src="' + img.src + '" alt="Detection result" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;animation:_pd_imgReveal 0.55s cubic-bezier(0.22,1,0.36,1) both;">';
+                wrap.innerHTML = `
+                    <div style="position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+                        <img src="${img.src}" alt="Detection result" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;animation:_pd_imgReveal 0.55s cubic-bezier(0.22,1,0.36,1) both;">
+                        <div style="position:absolute;top:10px;right:10px;background:#22c55e;color:white;font-size:0.6rem;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:0.05em;box-shadow:0 2px 6px rgba(0,0,0,0.2);animation:_pd_statusIn 0.5s ease both;">
+                            Valid
+                        </div>
+                    </div>
+                `;
                 wrap.style.display = 'flex';
             } else {
                 var txt = (sourceEl.textContent || '').trim();

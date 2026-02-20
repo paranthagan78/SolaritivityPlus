@@ -2,74 +2,76 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Solar PV — Dashboard</title>
-  {% include 'partials/css.html' %}
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width,initial-scale=1" />
+     <title>Solar PV — Dashboard</title>
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com">
+     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+     {% include 'partials/css.html' %}
 </head>
 
 <body>
 
-  <!-- ══════════════════════════════════════════
+     <!-- ══════════════════════════════════════════
      NAV
 ══════════════════════════════════════════ -->
-  {% include 'partials/nav.html' %}
+     {% include 'partials/nav.html' %}
 
-  <main>
+     <main>
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: DETECT
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_detect.html' %}
+          {% include 'partials/panel_detect.html' %}
 
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: CARBON
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_carbon.html' %}
+          {% include 'partials/panel_carbon.html' %}
 
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: XAI
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_xai.html' %}
+          {% include 'partials/panel_xai.html' %}
 
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: THERMAL (LEGACY)
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_thermal.html' %}
+          {% include 'partials/panel_thermal.html' %}
 
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: THERMAL DETECTION
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_detect_thermal.html' %}
+          {% include 'partials/panel_detect_thermal.html' %}
 
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: THERMAL XAI
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_xai_thermal.html' %}
+          {% include 'partials/panel_xai_thermal.html' %}
 
 
-    <!-- ══════════════════════════════════════════
+          <!-- ══════════════════════════════════════════
      PANEL: SUMMARY
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_summary.html' %}
+          {% include 'partials/panel_summary.html' %}
 
+     </main>
 
-    <!-- ══════════════════════════════════════════
-     PANEL: CHAT
+     <!-- ══════════════════════════════════════════
+     FLOATING CHATBOT WIDGET
 ══════════════════════════════════════════ -->
-    {% include 'partials/panel_chat.html' %}
+     {% include 'partials/panel_chat.html' %}
 
-  </main>
-
-  <!-- ══════════════════════════════════════════
+     <!-- ══════════════════════════════════════════
      JAVASCRIPT
 ══════════════════════════════════════════ -->
-  {% include 'partials/js.html' %}
+     {% include 'partials/js.html' %}
 </body>
 
 </html>
