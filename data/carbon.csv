@@ -7,10 +7,8 @@ timestamp,image_filename,city,panel_power_w,ambient_temp_c,irradiance_w_m2,emiss
 2026-02-20T14:39:18.708734,f4a6c5d070cd4d11a0bd5b9019d0e005.jpg,Chennai,380.0,30.0,900.0,0.82,1,finger,0.14,0.9
 2026-02-20T14:48:38.377801,ecbb22bbb95e4e8bacb99046315a110d.jpg,Chennai,380.0,32.0,900.0,0.82,1,black_core,37.43,204.64
 2026-02-20T15:07:02.130804,20d6525fdf7a4d1085cb1397de6fc188.jpg,Chennai,380.0,30.0,900.0,0.82,1,black_core,38.28,204.73
-<<<<<<< HEAD
 2026-02-20T16:52:45.206256,fa9a250a5d364e308d92301afa276be8.jpg,Chennai,380.0,32.0,900.0,0.82,2,finger,0.34,3.38
 2026-02-20T18:46:18.197115,3db7070a788c4c9e9728de40a2ec2c3e.jpg,Chennai,380.0,27.0,900.0,0.82,1,black_core,32.33,170.6
-=======
 2026-02-20T16:10:48.169351,d776dc1e2458451c923ddbcbd71d717c.jpg,Chennai,380.0,30.0,900.0,0.82,1,crack,12.76,69.12
 2026-02-20T16:11:03.203225,d776dc1e2458451c923ddbcbd71d717c.jpg,Chennai,380.0,30.0,900.0,0.82,1,crack,12.76,69.12
 2026-02-20T16:11:17.588066,d776dc1e2458451c923ddbcbd71d717c.jpg,Chennai,380.0,30.0,900.0,0.82,1,crack,12.76,69.12
@@ -49,3 +47,5 @@ timestamp,image_filename,city,panel_power_w,ambient_temp_c,irradiance_w_m2,emiss
 2026-02-20T23:27:59.501476,9e7e01f0a07b4d338969f2eda0efa874.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,1,black_core,37.64,200.48
 2026-02-20T23:30:27.958387,c3b7ae8ff7dc4ffab9f19292b0c97661.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,1,black_core,37.64,200.48
 2026-02-20T23:40:55.690781,4aca04cbda9441e2a91812954b992f83.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,2,finger,0.34,3.33
+2026-02-21T02:01:43.837283,b2fe617d3f1a4abcb0fbcde1833faa78.jpg,"Thalavapalayam, Karur",380.0,24.0,900.0,0.8,1,black_core,32.33,167.03
+2026-02-21T08:46:33.315224,e510dd3c95ee4eb084c5b3318ce4b857.jpg,"Thalavapalayam, Karur",380.0,26.0,900.0,0.8,1,crack,8.45,45.82
