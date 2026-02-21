@@ -62,3 +62,6 @@ timestamp,image_filename,city,panel_power_w,ambient_temp_c,irradiance_w_m2,emiss
 2026-02-21T09:19:13.227453,ac645665379b4b4d8fcb560cbb0ced2d.jpg,Chennai,380.0,32.0,900.0,0.82,1,black_core,39.27,204.64
 2026-02-21T09:21:48.315160,a444e738d98f4fbb94bada5110fd4575.jpg,"Thalavapalayam, Karur",380.0,28.0,900.0,0.8,1,black_core,38.28,200.78
 2026-02-21T09:38:08.276310,5bd1493a63a14d17bb6b7435cab529a2.jpg,"Thalavapalayam, Karur",380.0,28.0,900.0,0.8,1,black_core,38.28,200.78
+2026-02-21T09:57:22.803789,8dcbf0ba333248e4a7df87e4e9c6a69e.jpg,"Thalavapalayam, Karur",380.0,29.0,900.0,0.8,5,finger,0.83,7.07
+2026-02-21T12:18:58.180630,590f5a5e6bab48c29a2b483520177703.jpg,"Thalavapalayam, Karur",380.0,32.0,900.0,0.8,1,black_core,38.28,200.77
+2026-02-21T12:22:46.377306,62a5fce2fb7a460488449907f33b29b9.jpg,"Thalavapalayam, Karur",380.0,32.0,900.0,0.8,1,black_core,38.28,200.77
