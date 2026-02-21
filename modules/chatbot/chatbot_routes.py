@@ -1,4 +1,12 @@
-"""modules/chatbot/chatbot_routes.py"""
+"""modules/chatbot/chatbot_routes.py
+Flask blueprint for the RAG chatbot — with sentiment analysis support.
+
+CHANGES FROM ORIGINAL:
+  - /api/chat/query now returns sentiment metadata (label, score, compound, is_negative)
+    alongside the answer, so the frontend can show a mood indicator or adapt the UI.
+  - answer_query() now returns a dict instead of a plain string.
+  - All existing routes and their signatures are preserved unchanged.
+"""
 from flask import Blueprint, request, jsonify
 from auth import require_auth
 from .rag_engine import answer_query
@@ -17,6 +25,16 @@ def query():
         "history":        [{role, content}, ...],   // optional
         "image_filename": "abc123.jpg"              // optional, current session image
     }
+
+    Response body:
+    {
+        "success":            true,
+        "answer":             "...",
+        "sentiment_label":    "negative",      // "positive" | "neutral" | "negative"
+        "sentiment_score":    0.91,            // DistilBERT confidence
+        "sentiment_compound": -0.82,           // -1.0 (very negative) → +1.0 (very positive)
+        "is_negative":        true             // true = empathetic mode was activated
+    }
     """
     body           = request.get_json(silent=True) or {}
     question       = (body.get("question") or "").strip()
@@ -27,8 +45,17 @@ def query():
         return jsonify({"success": False, "error": "Question is required."}), 400
 
     try:
-        answer = answer_query(question, history, image_filename=image_filename)
-        return jsonify({"success": True, "answer": answer}), 200
+        result = answer_query(question, history, image_filename=image_filename)
+
+        return jsonify({
+            "success":            True,
+            "answer":             result["answer"],
+            "sentiment_label":    result["sentiment_label"],
+            "sentiment_score":    result["sentiment_score"],
+            "sentiment_compound": result["sentiment_compound"],
+            "is_negative":        result["is_negative"],
+        }), 200
+
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 503
     except Exception as e:

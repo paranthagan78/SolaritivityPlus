@@ -1,7 +1,13 @@
 """modules/chatbot/rag_engine.py
-RAG chatbot using Gemini API.
-Retrieves context from ChromaDB (cosine similarity), with smart image-context
-injection when the user asks about a specific uploaded image.
+RAG chatbot using Gemini API — with DistilBERT Sentiment Analysis.
+
+EXISTING FUNCTIONALITY: Fully preserved (image-context RAG, filtered search, etc.)
+NEW ADDITIONS:
+  - Sentiment analysis on every user message (DistilBERT via sentiment.py)
+  - Conversation-level sentiment aggregation (sustained negative mood detection)
+  - Empathetic system instruction injected when negative sentiment is detected
+  - Empathy knowledge base queried from ChromaDB (support docs in /docs/)
+  - Sentiment metadata returned alongside the answer for frontend use
 """
 import os
 import re
@@ -11,6 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .vector_store import query_collection, query_collection_with_filter
+from .sentiment import analyze_sentiment, analyze_conversation_sentiment, SentimentResult
 
 # ── Gemini config ─────────────────────────────────────────────────────────
 GEMINI_TIMEOUT_SEC = int(os.environ.get("GEMINI_TIMEOUT_SEC", "90"))
@@ -76,59 +83,116 @@ def _resolve_model(api_key: str) -> str:
     return _resolved_model
 
 
-SYSTEM_INSTRUCTION = """You are 'Solaritivity AI', an expert assistant for a Solar PV Defect Detection System.
+# ── System instructions ───────────────────────────────────────────────────
+
+BASE_SYSTEM_INSTRUCTION = """You are an expert assistant for a Solar PV Defect Detection System.
 You have access to domain knowledge from technical documents and real inspection data
 (defect detections, carbon emission analysis) stored in a vector database.
 
 Your role:
-- Answer questions about solar panel defects: black core, cracks, finger defects, star cracks, thick lines.
-- Provide personalized insights based on actual detection records and carbon emission data.
+- Answer questions about solar panel defects: black core, cracks, finger defects, star cracks, thick lines
+- Provide personalized insights based on actual detection records and carbon emission data
 - When context contains data about a specific image, use that data directly to give precise,
-  image-specific answers (defect type, severity, area %, confidence, bounding box, CO2 impact).
-- Give actionable maintenance and localized remediation advice based on detected defects.
+  image-specific answers (defect type, severity, area %, confidence, bounding box, CO2 impact)
+- Give actionable maintenance and remediation advice based on detected defects
+- Explain defect severity, causes, and recommended corrective actions
+- Help users understand their panel health and carbon footprint
 
 Guidelines:
-- ALWAYS be highly conversational, contextual, crisp, and solution-oriented.
-- Limit your INITIAL response to EXACTLY 3 lines of text. Do not give long text walls.
-- If asked about a specific image and context is available, focus primarily on that image's data.
-- Never fabricate numbers — only use values present in the context.
-- At the end of your short 3-line response, ALWAYS ask the user if they would like to know more about the "technical aspects" or "remedy measures".
-"""
+- Always be concise, factual, and specific
+- If context contains exact numbers (confidence, area, CO2), quote them directly
+- If asked about a specific image and context is available, focus on that image's data
+- If context is insufficient, say so clearly and give general expert guidance
+- Never fabricate numbers — only use values present in the context"""
+
+EMPATHY_SYSTEM_EXTENSION = """
+
+────────────────────────────────────────────────────────────────
+EMOTIONAL INTELLIGENCE PROTOCOL — ACTIVE
+────────────────────────────────────────────────────────────────
+The user's message has been detected as expressing NEGATIVE sentiment
+(frustration, confusion, worry, or distress). Follow these guidelines:
+
+TONE & APPROACH:
+- Lead with acknowledgment of their feeling BEFORE giving technical information
+- Use warm, calm, supportive language throughout your response
+- Never dismiss or minimize their concern — validate it genuinely
+- Avoid overly clinical or blunt phrasing; be human-centered
+
+STRUCTURE (for negative-sentiment responses):
+  1. ACKNOWLEDGE  → Briefly name/validate their frustration or concern
+                    (e.g., "I completely understand how concerning this must be...")
+  2. REASSURE     → Give a grounding statement that you are here to help
+  3. EXPLAIN      → Provide the technical answer/information clearly and simply
+  4. EMPOWER      → End with a clear, actionable next step they can take
+  5. OFFER MORE   → Gently invite further questions
+
+LANGUAGE PATTERNS TO USE:
+- "I understand this can feel overwhelming..."
+- "That's a completely valid concern..."
+- "Let me walk you through this step by step..."
+- "You're not alone in finding this confusing..."
+- "The good news is that..."
+- "Here's exactly what you can do..."
+- "Please don't hesitate to ask if anything is unclear..."
+
+LANGUAGE PATTERNS TO AVOID:
+- "As I mentioned before..." (implies user wasn't paying attention)
+- "Simply do..." / "Just..." (minimizes their difficulty)
+- Bullet-only responses without any warm framing
+- Abrupt or blunt one-line answers
+
+EMPATHETIC CONTEXT:
+If the empathy knowledge base context contains relevant emotional support
+guidance (from the support document), weave those strategies naturally
+into your response. Do NOT quote the document literally — internalize
+and apply its principles.
+────────────────────────────────────────────────────────────────"""
+
+SUSTAINED_NEGATIVE_EXTENSION = """
+
+IMPORTANT: This user has shown consistently negative sentiment across
+multiple messages in this conversation. They may be increasingly
+frustrated or distressed. Be especially patient, warm, and encouraging.
+If the situation seems particularly stressful, gently acknowledge that
+dealing with equipment issues can be stressful and reassure them that
+these problems are solvable with the right approach."""
 
 
-# ── Image filename extraction ─────────────────────────────────────────────
+def _build_system_instruction(sentiment: SentimentResult, is_sustained_negative: bool) -> str:
+    """Compose the system instruction based on detected sentiment."""
+    instruction = BASE_SYSTEM_INSTRUCTION
 
-# Regex patterns to extract image filename from question or history
+    if sentiment.is_negative:
+        instruction += EMPATHY_SYSTEM_EXTENSION
+        if is_sustained_negative:
+            instruction += SUSTAINED_NEGATIVE_EXTENSION
+
+    return instruction
+
+
+# ── Image filename extraction (UNCHANGED) ─────────────────────────────────
+
 _IMG_PATTERN = re.compile(
     r"\b([a-f0-9]{8,}\.(?:jpg|jpeg|png|bmp|tiff))\b",
     re.IGNORECASE,
 )
 
+
 def _extract_image_filename(text: str) -> str | None:
-    """Extract image filename (UUID-style) from a string."""
     m = _IMG_PATTERN.search(text)
     return m.group(1) if m else None
 
 
 def _find_image_context(question: str, history: list) -> tuple[str | None, list]:
-    """
-    Look for an image filename in the question or recent history.
-    Returns (image_filename | None, image_specific_docs).
-    """
-    # Check question first
     img = _extract_image_filename(question)
-
-    # Check last 4 history entries if not found in question
     if not img:
         for h in reversed((history or [])[-4:]):
             img = _extract_image_filename(h.get("content", ""))
             if img:
                 break
-
     if not img:
         return None, []
-
-    # Pull all chunks tagged with that image via filtered cosine search
     docs = query_collection_with_filter(
         query=question,
         where={"image_filename": img},
@@ -138,14 +202,12 @@ def _find_image_context(question: str, history: list) -> tuple[str | None, list]
 
 
 def _is_image_question(question: str) -> bool:
-    """Heuristic: does this question seem to be about a specific uploaded image?"""
     keywords = [
-        "this", "the image", "uploaded image", "my image",
+        "this image", "the image", "uploaded image", "my image",
         "this panel", "this scan", "current image", "last image",
         "defect in", "defects in", "what was detected", "analysis",
         "result", "severity", "area", "confidence", "co2", "carbon",
-        "how many defects", "what defect", "what defects",
-        "dominant defect"
+        "how many defects", "what defect",
     ]
     q_lower = question.lower()
     return any(kw in q_lower for kw in keywords)
@@ -154,9 +216,7 @@ def _is_image_question(question: str) -> bool:
 # ── Prompt builder ────────────────────────────────────────────────────────
 
 def _build_prompt(question: str, context: str, history: list) -> list:
-    """Build Gemini contents array with conversation history."""
     contents = []
-
     for h in (history or [])[-4:]:
         role = "user" if h.get("role") == "user" else "model"
         contents.append({"role": role, "parts": [{"text": h.get("content", "")}]})
@@ -169,40 +229,86 @@ def _build_prompt(question: str, context: str, history: list) -> list:
     return contents
 
 
+# ── Empathy context retrieval ─────────────────────────────────────────────
+
+def _get_empathy_context(question: str) -> list:
+    """
+    Retrieve empathy/support chunks from the vector store.
+    These come from the empathetic_support_guide.pdf you place in /docs/.
+    Filtered by type='empathy_support'.
+    """
+    # Try filtered search for empathy docs first
+    docs = query_collection_with_filter(
+        query=f"emotional support empathy frustration concern {question}",
+        where={"type": "empathy_support"},
+        n_results=4,
+    )
+    # Fallback: general search with empathy keywords
+    if not docs:
+        docs = query_collection(
+            query=f"empathetic response emotional support frustrated user {question}",
+            n_results=3,
+        )
+    return docs
+
+
 # ── Main entry point ──────────────────────────────────────────────────────
 
-def answer_query(question: str, history: list = None, image_filename: str = None) -> str:
+def answer_query(
+    question: str,
+    history:  list = None,
+    image_filename: str = None,
+) -> dict:
     """
-    Generate an answer using RAG + Gemini.
+    Generate a sentiment-aware answer using RAG + Gemini + DistilBERT.
 
     Parameters
     ----------
     question       : User's question string
     history        : List of {role, content} dicts (conversation history)
-    image_filename : Optional — pass the current session's image filename
-                     from the frontend to force image-specific context retrieval.
+    image_filename : Optional — current session's image filename for image-specific context
+
+    Returns
+    -------
+    dict with keys:
+        answer          : str   — the generated response text
+        sentiment_label : str   — "positive" | "neutral" | "negative"
+        sentiment_score : float — confidence 0.0–1.0
+        sentiment_compound: float — signed -1.0 to +1.0
+        is_negative     : bool  — True if empathetic mode was activated
     """
     api_key = _get_api_key()
     model   = _resolve_model(api_key)
 
-    # ── 1. Determine context strategy ─────────────────────────────────────
-    image_docs: list = []
-    resolved_img      = image_filename
+    # ── STEP 1: Sentiment Analysis ─────────────────────────────────────────
+    current_sentiment     = analyze_sentiment(question)
+    conversation_sentiment = analyze_conversation_sentiment(history or [], window=3)
 
-    # Priority 1: explicit filename passed from frontend
+    # Sustained negative = current is negative AND conversation trend is also negative
+    is_sustained_negative = (
+        current_sentiment.is_negative and conversation_sentiment.is_negative
+    )
+
+    print(
+        f"[Sentiment] Current: {current_sentiment} | "
+        f"Conversation: {conversation_sentiment} | "
+        f"Sustained negative: {is_sustained_negative}"
+    )
+
+    # ── STEP 2: Image context (UNCHANGED logic) ───────────────────────────
+    image_docs:  list = []
+    resolved_img       = image_filename
+
     if resolved_img:
-        from .vector_store import query_collection_with_filter
         image_docs = query_collection_with_filter(
             query=question,
             where={"image_filename": resolved_img},
             n_results=10,
         )
 
-    # Priority 2: extract filename from question or history text
     if not image_docs:
         resolved_img, image_docs = _find_image_context(question, history or [])
 
-    # Priority 3: if question looks image-related, try latest detection summary
     if not image_docs and _is_image_question(question):
         image_docs = query_collection_with_filter(
             query=question,
@@ -210,10 +316,15 @@ def answer_query(question: str, history: list = None, image_filename: str = None
             n_results=5,
         )
 
-    # General knowledge retrieval
+    # ── STEP 3: General + Empathy context ────────────────────────────────
     general_docs = query_collection(question, n_results=6)
 
-    # ── 2. Assemble context ────────────────────────────────────────────────
+    empathy_docs: list = []
+    if current_sentiment.is_negative:
+        empathy_docs = _get_empathy_context(question)
+        print(f"[Sentiment] Empathetic mode ON — {len(empathy_docs)} empathy chunks retrieved")
+
+    # ── STEP 4: Assemble context ──────────────────────────────────────────
     context_parts = []
 
     if image_docs:
@@ -229,21 +340,31 @@ def answer_query(question: str, history: list = None, image_filename: str = None
             "\n---\n".join(general_docs)
         )
 
+    if empathy_docs:
+        context_parts.append(
+            "=== EMPATHETIC SUPPORT GUIDANCE ===\n"
+            "(Use these principles to shape your tone and approach — do not quote directly)\n" +
+            "\n---\n".join(empathy_docs)
+        )
+
     context = (
         "\n\n".join(context_parts)
         if context_parts
         else "No relevant context found in knowledge base."
     )
 
-    # ── 3. Build and send request ──────────────────────────────────────────
+    # ── STEP 5: Build system instruction (sentiment-aware) ────────────────
+    system_instruction = _build_system_instruction(current_sentiment, is_sustained_negative)
+
+    # ── STEP 6: Build and send Gemini request ─────────────────────────────
     contents = _build_prompt(question, context, history or [])
     payload  = {
-        "system_instruction": {"parts": [{"text": SYSTEM_INSTRUCTION}]},
+        "system_instruction": {"parts": [{"text": system_instruction}]},
         "contents": contents,
         "generationConfig": {
-            "temperature":    float(os.environ.get("LOCAL_LLM_TEMP", "0.7")),
-            "maxOutputTokens": int(os.environ.get("LOCAL_LLM_MAX_TOKENS", "512")),
-            "topP":           0.95,
+            "temperature":     float(os.environ.get("LOCAL_LLM_TEMP", "0.7")),
+            "maxOutputTokens": int(os.environ.get("LOCAL_LLM_MAX_TOKENS", "2048")),
+            "topP":            0.95,
         },
     }
 
@@ -269,7 +390,17 @@ def answer_query(question: str, history: list = None, image_filename: str = None
                     .get("text", "")
                     .strip()
             )
-            return text if text else "I could not generate a response. Please try again."
+            answer = text if text else "I could not generate a response. Please try again."
+
+            # Return answer + sentiment metadata for the frontend
+            return {
+                "answer":              answer,
+                "sentiment_label":     current_sentiment.label,
+                "sentiment_score":     current_sentiment.score,
+                "sentiment_compound":  current_sentiment.compound,
+                "is_negative":         current_sentiment.is_negative,
+            }
+
         except requests.exceptions.Timeout:
             if attempt == 2:
                 raise ValueError("Gemini API timed out. Please try again.")

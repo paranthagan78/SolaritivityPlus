@@ -1,25 +1,22 @@
-"""modules/chatbot/sentiment.py
+"""modules/chatbot/sentiment.py  [FIXED v3 - eager model warmup]
 Transformer-based sentiment analysis using DistilBERT.
 
 Model: distilbert-base-uncased-finetuned-sst-2-english
 
-ROOT CAUSE OF THE BUG (and fixes applied):
-  DistilBERT was trained on the SST-2 movie review dataset.
-  It treats domain words like "defect", "crack", "broken", "damage" as
-  strongly negative — because in movie reviews, those words ARE negative.
-  In a solar inspection chatbot, they are neutral technical terms.
+FIXES IN v3:
+  - Added warmup_sentiment_model() for eager loading at app startup.
+    Previously the lazy-load design meant teammates who hadn't downloaded
+    the model would silently fall back to rule-based sentiment for ALL
+    requests, since the model hadn't loaded before requests started arriving.
+  - Added _model_loaded / _model_failed flags so load state is always known.
+  - Warm-up inference pass runs after load so first real request isn't slow.
 
-  Three-layer defence added:
-    1. QUESTION GUARD     — plain informational questions (what/how/where/
-                            show/list/detect...) are forced to neutral BEFORE
-                            reaching the model. "What defects are in this image?"
-                            is a query, not a complaint.
-    2. RAISED THRESHOLDS  — neutral zone raised from 0.65 → 0.80 confidence.
-                            Negative trigger tightened from -0.20 → -0.55.
-    3. EMOTION KEYWORD GATE — even if DistilBERT says "negative" with high
-                            confidence, empathetic mode only activates when
-                            the message contains a genuine emotional word
-                            (frustrated, worried, confused, etc.).
+GUARDS AGAINST DISTILBERT FALSE POSITIVES (from v2, preserved):
+  1. QUESTION GUARD      — plain informational questions forced to neutral
+  2. RAISED THRESHOLDS   — neutral zone 0.80, negative trigger -0.55
+  3. EMOTION KEYWORD GATE — must contain a real emotional word to trigger
+                            empathetic mode (prevents "what defects are in
+                            my image?" from triggering empathy)
 """
 
 from __future__ import annotations
@@ -46,14 +43,19 @@ class SentimentResult:
 
 # ── Tuning constants ──────────────────────────────────────────────────────
 
-# DistilBERT confidence below this -> "neutral" (conservative to avoid false negatives)
-NEUTRAL_THRESHOLD = 0.80
+NEUTRAL_THRESHOLD   = 0.80   # DistilBERT confidence below this -> "neutral"
+NEGATIVE_TRIGGER    = -0.55  # compound must be this negative to trigger empathy
+MIN_WORDS_FOR_MODEL = 6      # messages shorter than this skip the model
 
-# Compound must be THIS negative to trigger empathetic mode
-NEGATIVE_TRIGGER  = -0.55
+MODEL_NAME = "distilbert-base-uncased-finetuned-sst-2-english"
 
-# Messages shorter than this skip the model (unreliable on very short text)
-MIN_WORDS_FOR_MODEL = 6
+
+# ── Model state flags (module-level) ─────────────────────────────────────
+# These are checked by app.py health endpoint and _get_pipeline()
+
+_pipeline     = None   # the loaded HuggingFace pipeline object
+_model_loaded = False  # True once model confirmed ready
+_model_failed = False  # True if transformers not installed or load failed
 
 
 # ── Guard 1: Question / informational intent detection ────────────────────
@@ -85,24 +87,16 @@ def _is_informational_question(text: str) -> bool:
     """
     stripped   = text.strip()
     word_count = len(stripped.split())
-
     if _QUESTION_STARTERS.match(stripped):
         return True
-
     if _ENDS_WITH_QUESTION.search(stripped):
         return True
-
-    # Short message containing only technical vocabulary -> query, not emotion
     if word_count < MIN_WORDS_FOR_MODEL and _FACTUAL_PHRASES.search(stripped):
         return True
-
     return False
 
 
 # ── Guard 3: Genuine emotion keyword requirement ──────────────────────────
-# DistilBERT can fire "negative" on purely technical text.
-# We require at least one real emotional word to be present before
-# activating empathetic mode.
 
 _EMOTION_KEYWORDS = re.compile(
     r"\b(frustrated|frustrating|frustration|angry|upset|worried|worry|anxious|"
@@ -123,34 +117,99 @@ def _has_emotion_signal(text: str) -> bool:
     return bool(_EMOTION_KEYWORDS.search(text))
 
 
-# ── DistilBERT model (lazy-loaded singleton) ──────────────────────────────
+# ── Eager warmup (call this from app.py at startup) ───────────────────────
 
-_pipeline = None
+def warmup_sentiment_model() -> bool:
+    """
+    Eagerly load and warm up the DistilBERT model.
+
+    Call this ONCE at application startup inside create_app() in app.py.
+    Blocks until the model is downloaded (~67 MB, first run only) and loaded.
+
+    This prevents the teammate problem: without eager loading, the lazy-load
+    design means the first N requests all arrive before the model is ready
+    and silently fall back to rule-based sentiment instead of DistilBERT.
+
+    Returns
+    -------
+    bool — True if DistilBERT loaded successfully,
+           False if falling back to rule-based (transformers not installed).
+    """
+    global _pipeline, _model_loaded, _model_failed
+
+    if _model_loaded:
+        print("[Sentiment] Model already loaded, skipping warmup.")
+        return True
+    if _model_failed:
+        print("[Sentiment] Model previously failed to load, skipping warmup.")
+        return False
+
+    print("[Sentiment] ── Warming up DistilBERT sentiment model ──────────")
+    print(f"[Sentiment] Model : {MODEL_NAME}")
+    print("[Sentiment] Note  : First run downloads ~67 MB (cached after that)...")
+
+    try:
+        from transformers import pipeline as hf_pipeline
+
+        _pipeline = hf_pipeline(
+            task="sentiment-analysis",
+            model=MODEL_NAME,
+        )
+
+        # Warm-up inference pass — compiles the model graph so the first
+        # real user request isn't slower than subsequent ones
+        _ = _pipeline("Solar panel inspection warm-up pass.")
+
+        _model_loaded = True
+        print("[Sentiment] ✓ DistilBERT loaded and ready.")
+        return True
+
+    except ImportError:
+        _model_failed = True
+        print(
+            "[Sentiment] ✗ 'transformers' package not found.\n"
+            "  Fix: pip install transformers torch\n"
+            "  Falling back to rule-based sentiment analysis."
+        )
+        return False
+
+    except Exception as e:
+        _model_failed = True
+        print(
+            f"[Sentiment] ✗ Model load failed: {e}\n"
+            f"  Falling back to rule-based sentiment analysis."
+        )
+        return False
 
 
 def _get_pipeline():
-    global _pipeline
-    if _pipeline is not None:
+    """
+    Return the loaded pipeline.
+
+    Normally _pipeline is already set by warmup_sentiment_model() at startup.
+    This function is a safety net in case warmup was somehow skipped —
+    it triggers a lazy load rather than crashing. But if app.py is correct,
+    this path should never be needed.
+    """
+    global _model_loaded, _model_failed
+
+    if _model_loaded:
         return _pipeline
-    try:
-        from transformers import pipeline as hf_pipeline
-        print("[Sentiment] Loading DistilBERT sentiment model...")
-        _pipeline = hf_pipeline(
-            task="sentiment-analysis",
-            model="distilbert-base-uncased-finetuned-sst-2-english",
-        )
-        print("[Sentiment] DistilBERT model loaded successfully.")
-    except ImportError:
-        print(
-            "[Sentiment] WARNING: 'transformers' not installed. "
-            "Run: pip install transformers torch\n"
-            "Falling back to rule-based sentiment."
-        )
-        _pipeline = None
+    if _model_failed:
+        return None
+
+    # Safety net: warmup wasn't called at startup — trigger it now
+    print(
+        "[Sentiment] WARNING: warmup_sentiment_model() was not called at startup.\n"
+        "  Add it to create_app() in app.py for reliable behaviour.\n"
+        "  Triggering lazy load now..."
+    )
+    warmup_sentiment_model()
     return _pipeline
 
 
 # ── Rule-based fallback ───────────────────────────────────────────────────
+# Used ONLY when transformers is not installed or model load failed.
 
 _NEG_WORDS = {
     "terrible", "horrible", "awful", "worst", "useless", "frustrated",
@@ -197,7 +256,6 @@ def _rule_based_sentiment(text: str) -> SentimentResult:
         score = 0.60
 
     is_neg = (compound <= NEGATIVE_TRIGGER) and _has_emotion_signal(text)
-
     return SentimentResult(label=label, score=score, is_negative=is_neg, compound=compound)
 
 
@@ -205,22 +263,22 @@ def _rule_based_sentiment(text: str) -> SentimentResult:
 
 def analyze_sentiment(text: str) -> SentimentResult:
     """
-    Analyze the sentiment of a user message.
+    Analyze the sentiment of a user message using DistilBERT.
 
     Parameters
     ----------
-    text : str  - the raw user message string.
+    text : str  — raw user message string
 
     Returns
     -------
-    SentimentResult - label, score, is_negative, compound
+    SentimentResult — label, score, is_negative, compound
     """
     if not text or not text.strip():
         return SentimentResult(label="neutral", score=1.0, is_negative=False, compound=0.0)
 
     # Guard 1: plain informational questions -> always neutral
     if _is_informational_question(text):
-        print(f"[Sentiment] Informational question detected -> forced neutral")
+        print("[Sentiment] Informational question -> forced neutral")
         return SentimentResult(label="neutral", score=0.95, is_negative=False, compound=0.0)
 
     # Guard 2: too short for reliable DistilBERT inference
@@ -229,17 +287,20 @@ def analyze_sentiment(text: str) -> SentimentResult:
         print(f"[Sentiment] Short message ({word_count} words) -> forced neutral")
         return SentimentResult(label="neutral", score=0.90, is_negative=False, compound=0.0)
 
+    # Truncate to 512 words for DistilBERT context window
+    # NOTE: this only affects the sentiment INPUT — has zero effect on chatbot output length
     truncated = " ".join(text.split()[:512])
     pipe = _get_pipeline()
 
     if pipe is not None:
         try:
             result    = pipe(truncated)[0]
-            raw_label = result["label"].lower()
-            raw_score = float(result["score"])
+            raw_label = result["label"].lower()   # "positive" or "negative"
+            raw_score = float(result["score"])    # 0.0–1.0
 
             compound = raw_score if raw_label == "positive" else -raw_score
 
+            # Carve out neutral zone for low-confidence predictions
             if raw_score < NEUTRAL_THRESHOLD:
                 label    = "neutral"
                 compound = compound * (raw_score / NEUTRAL_THRESHOLD)
@@ -269,7 +330,16 @@ def analyze_sentiment(text: str) -> SentimentResult:
 def analyze_conversation_sentiment(history: list, window: int = 3) -> SentimentResult:
     """
     Aggregate sentiment across the last `window` user messages.
-    More recent messages are weighted more heavily.
+    More recent messages are weighted more heavily (recency weighting).
+
+    Parameters
+    ----------
+    history : list[dict]  — each dict has keys "role" and "content"
+    window  : int         — how many recent user messages to consider
+
+    Returns
+    -------
+    SentimentResult — weighted aggregate result
     """
     user_msgs = [
         h["content"] for h in history
@@ -293,7 +363,7 @@ def analyze_conversation_sentiment(history: list, window: int = 3) -> SentimentR
 
     score = sum(r.score * w for r, w in zip(results, weights)) / total_w
 
-    # Sustained negative also requires at least one emotional message
+    # Sustained negative also requires at least one genuine emotional message
     any_emotion = any(_has_emotion_signal(m) for m in user_msgs)
     is_neg = (compound <= NEGATIVE_TRIGGER) and any_emotion
 

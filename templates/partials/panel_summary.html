@@ -20,7 +20,7 @@
                 </g>
             </svg>
             <div class="overlay-text">Analyzing Solar Data…</div>
-            
+
         </div>
     </div>
 
@@ -48,11 +48,11 @@
 
         <div class="summary-actions">
             <button class="action-pill" onclick="runIngest()" id="ingestBtn">
-                
+
                 <span class="pill-text">Ingest Data</span>
             </button>
             <button class="action-pill action-pill-pdf" onclick="showPdfModal()" id="pdfBtn">
-                
+
                 <span class="pill-text">Download PDF</span>
             </button>
         </div>
@@ -82,15 +82,15 @@
             </div>
             <div class="report-header-actions">
                 <button class="action-pill action-pill-sm" onclick="runIngest()" id="ingestBtn2">
-                    
+
                     <span class="pill-text">Ingest</span>
                 </button>
                 <button class="action-pill action-pill-pdf action-pill-sm" onclick="showPdfModal()">
-                    
+
                     <span class="pill-text">PDF</span>
                 </button>
                 <button class="action-pill action-pill-sm" onclick="regenerateSummary()">
-                    
+
                     <span class="pill-text">Regenerate</span>
                 </button>
             </div>
@@ -112,5 +112,17 @@
     </div>
 
     <!-- Next Step Button -->
-    
+    <div style="display:flex;justify-content:flex-end;margin-top:1.3rem;">
+        <button id="summaryNextBtn" onclick="nextTab('chat')"
+            style="background:#111;color:#f59e0b;font-size:0.85rem;padding:0.65rem 1.8rem;border-radius:35px;border:1px solid #222;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;letter-spacing:0.05em;display:none;align-items:center;gap:0.5em;box-shadow:0 3px 14px rgba(0,0,0,0.3);outline:none;transition:transform 0.15s,box-shadow 0.2s,border-color 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 22px rgba(0,0,0,0.4)';this.style.borderColor='#f59e0b'"
+            onmouseout="this.style.transform='';this.style.boxShadow='0 3px 14px rgba(0,0,0,0.3)';this.style.borderColor='#222'"
+            onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform=''">
+            Next Step: AI Assistant
+            <svg viewBox="0 0 24 24" width="13" height="13"
+                style="stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;">
+                <polyline points="9 18 15 12 9 6" />
+            </svg>
+        </button>
+    </div>
 </div><!-- /panel-summary -->
