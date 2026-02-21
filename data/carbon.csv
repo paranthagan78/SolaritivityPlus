@@ -49,3 +49,15 @@ timestamp,image_filename,city,panel_power_w,ambient_temp_c,irradiance_w_m2,emiss
 2026-02-20T23:27:59.501476,9e7e01f0a07b4d338969f2eda0efa874.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,1,black_core,37.64,200.48
 2026-02-20T23:30:27.958387,c3b7ae8ff7dc4ffab9f19292b0c97661.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,1,black_core,37.64,200.48
 2026-02-20T23:40:55.690781,4aca04cbda9441e2a91812954b992f83.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,2,finger,0.34,3.33
+2026-02-21T08:22:00.543834,202afc91227e44bfb73b917280781c4c.jpg,"Thalavapalayam, Karur",380.0,25.0,900.0,0.8,1,black_core,37.64,200.48
+2026-02-21T08:40:42.913738,8e8026f14bb2448fa966c3b555363815.jpg,"Thalavapalayam, Karur",380.0,26.0,900.0,0.8,1,black_core,38.28,200.48
+2026-02-21T08:43:20.178768,dbbfffed512849f5abbd8db3853a83ab.jpg,"Thalavapalayam, Karur",380.0,26.0,900.0,0.8,1,black_core,37.64,200.48
+2026-02-21T09:00:06.901018,3172bbd7795848fbb7ff0bab0806ee8e.jpg,"Thalavapalayam, Karur",380.0,27.0,900.0,0.8,2,finger,2.42,13.85
+2026-02-21T09:02:23.634324,fe305043ffe34d629c52b5bbef02453d.jpg,"Thalavapalayam, Karur",380.0,27.0,900.0,0.8,1,crack,1.16,6.69
+2026-02-21T09:03:19.008549,40d550410790458ea5f2dfb1a0beffc1.jpg,"Thalavapalayam, Karur",380.0,27.0,900.0,0.8,1,black_core,35.98,185.1
+2026-02-21T09:04:48.228536,65b20bd844da4dd7be81e64e5a62d397.jpg,"Thalavapalayam, Karur",380.0,27.0,900.0,0.8,1,black_core,39.27,200.72
+2026-02-21T09:12:12.633639,6f3e03f3a18c490692172e34e6bc9b82.jpg,Chennai,380.0,32.0,900.0,0.82,1,black_core,39.27,204.64
+2026-02-21T09:16:08.057523,fe53d4a66d3a4418b768acc7a1ea3eaa.jpg,"Thalavapalayam, Karur",380.0,27.0,900.0,0.8,1,black_core,39.27,200.72
+2026-02-21T09:17:54.697915,f8ba7eaa9e394dc1aedeff77fd4f7444.jpg,"Thalavapalayam, Karur",380.0,32.0,900.0,0.8,1,black_core,39.27,200.77
+2026-02-21T09:19:13.227453,ac645665379b4b4d8fcb560cbb0ced2d.jpg,Chennai,380.0,32.0,900.0,0.82,1,black_core,39.27,204.64
+2026-02-21T09:21:48.315160,a444e738d98f4fbb94bada5110fd4575.jpg,"Thalavapalayam, Karur",380.0,28.0,900.0,0.8,1,black_core,38.28,200.78
