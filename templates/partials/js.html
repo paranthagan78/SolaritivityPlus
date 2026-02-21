@@ -269,6 +269,9 @@
         // Clear alert notes
         const carbonNote = document.getElementById('carbonNote');
         if (carbonNote) carbonNote.style.display = 'none';
+
+        // Auto-refresh to reset all panels and state
+        location.reload();
     };
 
     async function runIntegrity() {
