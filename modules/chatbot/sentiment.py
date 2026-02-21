@@ -1,4 +1,4 @@
-"""modules/chatbot/sentiment.py
+"""modules/chatbot/sentiment.py  [FIXED v2]
 Transformer-based sentiment analysis using DistilBERT.
 
 Model: distilbert-base-uncased-finetuned-sst-2-english
