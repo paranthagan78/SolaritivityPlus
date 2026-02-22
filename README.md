@@ -1,7 +1,7 @@
-# Solaritivity — AI Driven Solar Defect Intelligence Platform
+# Solaritivity - AI Driven Solar Defect Intelligence Platform
 
-> An end-to-end governed AI system for Solar PV defect detection, impact estimation, and carbon intelligence. 
-> Built to power India’s march toward Viksit Bharat 2047 with reliable, efficient, and safe solar infrastructure.
+An end to end governed AI system for Solar PV defect detection, impact estimation, and carbon intelligence. 
+Built to power India’s march toward Viksit Bharat 2047 with reliable, efficient, and safe solar infrastructure.
 
 ---
 
@@ -9,23 +9,49 @@
 
 As India races toward Viksit Bharat 2047, solar energy is positioned to become the backbone of sustainable industrial growth. Yet, Solar PV modules silently lose 5-30% energy due to micro-cracks, manufacturing defects, and thermal hotspots. These degradations shorten module lifespan by 3-8 years, increase O&M costs, and elevate fire risks  directly impacting national grid reliability, industrial productivity, and carbon efficiency. Despite 800+ GW of installed capacity worldwide, inspections remain manual, inconsistent, and non governed.
 
-
 ---
 
 ## **Project Vision**
 
 Solaritivity is built on five core pillars - Integrity, Detectability, Interpretability, Sustainability, and Explainability forming a unified, future ready ecosystem for governed solar defect intelligence.
 
-- **Multi-modal defect detection & localization**
+- **Multi modal defect detection & localization**
 - **Energy loss + carbon impact analysis**
-- **RAG-Based Personalized Chatbot** with sentiment-driven response behavior
+- **RAG Based Personalized Chatbot** with sentiment-driven response behavior
 - **Digital Twin Layer** for future simulation modules
 - **Explainable AI (XAI)** visualizations
 - **Pipeline Automation** (Ingestion → Detection → Insights)
-- **Real-time monitoring layer** for enterprise-ready deployment
+- **Real time monitoring layer** for enterprise ready deployment
 
 ---
 
 ## 🏗️ **System Architecture**
 
-👉 *Add your architecture diagram here*
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/700b97d2-22d8-4e6c-9c00-9f97317573db" />
+
+---
+
+## **How to Use (Quick Start Guide)**
+
+Follow these steps to run Solaritivity.
+
+### 1️⃣ Clone the Repository
+```bash
+git clone https://github.com/paranthagan78/SolaritivityPlus
+cd SolaritivityPlus
+```
+
+### 2️⃣ Create a Virtual Environment & Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3️⃣ Ingest the Document Dataset
+```bash
+python ingest.py
+```
+
+### 4️⃣ Start the Application
+```bash
+python app.py
+```
