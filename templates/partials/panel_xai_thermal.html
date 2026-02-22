@@ -1,6 +1,6 @@
 <!-- ══════════════════════════════════════════
-     PANEL: XAI THERMAL  —  Auto-Flow GradCAM for Thermal
-     Cyan theme. Uses /api/thermal/gradcam.
+     PANEL: XAI THERMAL  —  Auto-Flow LIME for Thermal
+     Cyan theme. Uses /api/thermal/lime.
 ══════════════════════════════════════════ -->
 
 <style>
@@ -157,7 +157,7 @@
             </div>
             <div>
                 <div id="tx-step-2-label" style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#555;">
-                    Generating Heatmap</div>
+                    Generating Explanation</div>
                 <div id="tx-step-2-sub"
                     style="font-family:'DM Sans',sans-serif;font-size:0.68rem;color:#444;margin-top:0.15rem;">Waiting...
                 </div>
@@ -208,11 +208,11 @@
     <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.2rem;">
         <div
             style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#ffffff;">
-            Thermal <span style="color:#06b6d4;">GradCAM</span>
+            Thermal <span style="color:#06b6d4;">LIME</span>
         </div>
         <div
             style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
-            XAI · Neural Attention</div>
+            XAI · Local Interpretable Explanations</div>
     </div>
 
     <!-- Two-column split -->
@@ -228,7 +228,7 @@
                 </div>
                 <span
                     style="font-family:'Rajdhani',sans-serif;font-weight:600;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:#888;">Thermal
-                    Activation Heatmap</span>
+                    LIME Explanation</span>
             </div>
             <div
                 style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.2rem;overflow:hidden;">
@@ -242,7 +242,7 @@
                     </svg>
                     <p
                         style="font-size:0.76rem;color:#666;letter-spacing:0.1em;text-transform:uppercase;margin:0;font-family:'Rajdhani',sans-serif;font-weight:600;">
-                        Awaiting GradCAM</p>
+                        Awaiting LIME</p>
                 </div>
                 <div id="tx-heatmap-wrap"
                     style="display:none;width:100%;height:100%;align-items:center;justify-content:center;"></div>
@@ -254,13 +254,13 @@
                         <div
                             style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#ef4444,#f97316);">
                         </div>
-                        <span>Warm = high activation</span>
+                        <span>Warm = positive influence</span>
                     </div>
                     <div style="display:flex;align-items:center;gap:0.35rem;">
                         <div
                             style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#3b82f6,#06b6d4);">
                         </div>
-                        <span>Cool = low activation</span>
+                        <span>Cool = negative influence</span>
                     </div>
                 </div>
             </div>
@@ -370,7 +370,7 @@
             if (heatPH) heatPH.style.display = 'none';
             if (heatDot) { heatDot.style.background = '#06b6d4'; heatDot.style.animation = '_tx_pulse 2.5s ease-in-out infinite'; }
             if (heatWrap) {
-                heatWrap.innerHTML = '<img src="' + r.explanation_image + '?t=' + Date.now() + '" alt="Thermal GradCAM" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;animation:_tx_imgReveal 0.55s cubic-bezier(0.22,1,0.36,1) both;">';
+                heatWrap.innerHTML = '<img src="' + r.explanation_image + '?t=' + Date.now() + '" alt="Thermal LIME" style="max-width:100%;max-height:100%;border-radius:10px;object-fit:contain;animation:_tx_imgReveal 0.55s cubic-bezier(0.22,1,0.36,1) both;">';
                 heatWrap.style.display = 'flex';
             }
             if (legend) legend.style.display = 'block';
@@ -384,9 +384,9 @@
             var html = '';
             html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem;">';
             html += '<svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#06b6d4;fill:none;stroke-width:2;stroke-linecap:round;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
-            html += '<span style="font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">What is GradCAM?</span>';
+            html += '<span style="font-family:\'Rajdhani\',sans-serif;font-weight:600;font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;color:#888;">What is LIME?</span>';
             html += '</div>';
-            html += '<p style="font-size:0.78rem;color:#999;line-height:1.65;margin:0 0 1rem 0;">GradCAM highlights the regions of the thermal image that most influenced the model\'s classification decision, helping engineers understand which hotspots or anomalies the neural network focused on.</p>';
+            html += '<p style="font-size:0.78rem;color:#999;line-height:1.65;margin:0 0 1rem 0;">LIME (Local Interpretable Model-agnostic Explanations) perturbs the thermal image into superpixels to identify which local regions most positively or negatively influenced the model\'s classification decision.</p>';
 
             html += '<div style="height:1px;background:linear-gradient(90deg,transparent,#1a1a24 20%,#1a1a24 80%,transparent);margin-bottom:1rem;"></div>';
 
@@ -397,11 +397,11 @@
             html += '<div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1rem;">';
             html += '<div style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.78rem;color:#999;line-height:1.55;">';
             html += '<div style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#ef4444,#f97316);flex-shrink:0;margin-top:4px;"></div>';
-            html += '<span><strong style="color:#ef4444;">Warm regions</strong> (red/orange) = high neural activation driving the prediction.</span>';
+            html += '<span><strong style="color:#ef4444;">Warm regions</strong> (red/orange) = high positive influence driving the prediction.</span>';
             html += '</div>';
             html += '<div style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.78rem;color:#999;line-height:1.55;">';
             html += '<div style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#3b82f6,#06b6d4);flex-shrink:0;margin-top:4px;"></div>';
-            html += '<span><strong style="color:#3b82f6;">Cool regions</strong> (blue/cyan) = low activation, minimal impact.</span>';
+            html += '<span><strong style="color:#3b82f6;">Cool regions</strong> (blue/cyan) = negative influence or minimal impact.</span>';
             html += '</div>';
             html += '</div>';
 
@@ -480,14 +480,14 @@
                 txCompleteStep(1, (s.thermalFilename || 'image') + ' ready');
                 txSetProgress(30);
 
-                txActivateStep(2, 'Running neural network backward pass...');
-                txSetMain('Generating Heatmap', 'Computing gradient-weighted activations...');
+                txActivateStep(2, 'Generating superpixels and perturbing...');
+                txSetMain('Generating Explanation', 'Computing local interpretable explanations...');
                 txSetProgress(45);
 
-                var r = await window.apiForm('/api/thermal/gradcam', fd);
+                var r = await window.apiForm('/api/thermal/lime', fd);
 
                 if (r.success) {
-                    txCompleteStep(2, 'Heatmap generated');
+                    txCompleteStep(2, 'Explanation generated');
                     txSetProgress(85);
 
                     txActivateStep(3, 'Building visualisation...');
@@ -507,7 +507,7 @@
                     });
 
                 } else {
-                    txSetMain('GradCAM Failed', r.error || 'Unknown error');
+                    txSetMain('LIME Failed', r.error || 'Unknown error');
                     txSetProgress(100);
                     await new Promise(function (res) { setTimeout(res, 1500); });
                     txHideOverlay(function () {
@@ -515,7 +515,7 @@
                         var c = document.getElementById('tx-info-container');
                         var p = document.getElementById('tx-info-placeholder');
                         if (p) p.style.display = 'none';
-                        if (c) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' + (r.error || 'GradCAM failed') + '</div>'; c.style.display = 'block'; }
+                        if (c) { c.innerHTML = '<div style="text-align:center;padding:2rem;color:#ef4444;font-size:0.85rem;">' + (r.error || 'LIME failed') + '</div>'; c.style.display = 'block'; }
                     });
                 }
 

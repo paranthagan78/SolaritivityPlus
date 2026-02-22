@@ -89,10 +89,10 @@ def detect():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-# ── Thermal GradCAM ────────────────────────────────────────────────────────
-@thermal_bp.route("/gradcam", methods=["POST"])
+# ── Thermal LIME ────────────────────────────────────────────────────────
+@thermal_bp.route("/lime", methods=["POST"])
 @require_auth
-def thermal_gradcam():
+def thermal_lime():
     file = request.files.get("image")
     if not file or not allowed_file(file.filename):
         return jsonify({"success": False, "error": "Valid image required."}), 400
@@ -102,15 +102,16 @@ def thermal_gradcam():
     img_path = os.path.join(UPLOAD_FOLDER, f"thxai_{uid}.{ext}")
     file.save(img_path)
 
-    out_name = f"thgradcam_{uid}.jpg"
+    out_name = f"thlime_{uid}.jpg"
     out_path = os.path.join(EXPLAIN_FOLDER, out_name)
 
     try:
-        from modules.xai.gradcam import generate_gradcam
-        generate_gradcam(img_path, out_path)
+        from modules.xai.lime_xai import generate_lime
+        generate_lime(img_path, out_path)
         return jsonify({
             "success": True,
             "explanation_image": f"/explanations/{out_name}",
         }), 200
     except Exception as e:
+        import traceback; traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
