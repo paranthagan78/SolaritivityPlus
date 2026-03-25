@@ -1,0 +1,41 @@
+<!-- ══════════════════════════════════════════
+     FLOATING CHATBOT WIDGET
+══════════════════════════════════════════ -->
+<div id="chat-fab-container">
+    <button id="chat-fab" onclick="toggleChatWindow()" title="Chat with AI">
+        <i class="fa-solid fa-robot"></i>
+    </button>
+</div>
+
+<div id="chat-widget" class="chat-widget-hidden">
+    <!-- Header -->
+    <div class="chat-header">
+        <div class="chat-title">
+            Ask Helio
+        </div>
+        <button class="chat-close" onclick="toggleChatWindow()">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="chat-box widget-chat-box" id="chatBox">
+        <div class="msg bot">Hello! I'm your Solar PV assistant.
+            How can I help you today?</div>
+        <!-- Quick questions shown initially -->
+        <div class="quick-questions" id="quickQuestions">
+            <button class="qq-btn" onclick="sendQuickChat('What defects are in this image?')">What defects are in this
+                image?</button>
+            <button class="qq-btn" onclick="sendQuickChat('How can I reduce my carbon footprint?')">How can I reduce my
+                carbon footprint?</button>
+            <button class="qq-btn" onclick="sendQuickChat('What is the dominant defect?')">What is the dominant
+                defect?</button>
+        </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="chat-input-row widget-input-row">
+        <input type="text" id="chatInput" placeholder="Type your question..."
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}" />
+        <button class="btn btn-primary" onclick="sendChat()">➤</button>
+    </div>
+</div>
+<!-- /floating-chatbot-widget -->
