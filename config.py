@@ -53,7 +53,7 @@ INDIA_EMISSION_FACTORS = {
 }
 
 # ── Auth ───────────────────────────────────────────────────────────────────
-PASSCODE         = os.environ.get("PASSCODE", "HackFest")
+PASSCODE         = os.environ.get("PASSCODE", "Solar@2026")
 SESSION_TIMEOUT  = int(os.environ.get("SESSION_TIMEOUT", 3600))
 MAX_ATTEMPTS     = 5
 LOCKOUT_DURATION = 300

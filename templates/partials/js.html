@@ -185,9 +185,14 @@
 
             // Match city dropdown
             const sel = document.getElementById('carbonCity');
-            for (const opt of sel.options) {
-                if ((geo.city || '').toLowerCase().includes(opt.value.toLowerCase())) {
-                    sel.value = opt.value; break;
+            if (sel) {
+                for (const opt of sel.options) {
+                    const val = opt.value.toLowerCase();
+                    const cty = (geo.city || '').toLowerCase();
+                    if (cty.includes(val) || val.includes(cty)) {
+                        sel.value = opt.value; 
+                        break;
+                    }
                 }
             }
 

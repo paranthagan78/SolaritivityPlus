@@ -768,34 +768,42 @@
                 pcSetMain('Detecting Location', 'Using IP-based geolocation...');
                 pcSetProgress(15);
 
-                var geo = await window.api('/api/weather/location');
-                if (geo.success) {
-                    window.state.geoLat = geo.lat;
-                    window.state.geoLon = geo.lon;
-                    city = geo.city || 'Chennai';
-
-                    /* Match city dropdown */
-                    var sel = document.getElementById('carbonCity');
-                    if (sel) {
-                        for (var i = 0; i < sel.options.length; i++) {
-                            if ((geo.city || '').toLowerCase().indexOf(sel.options[i].value.toLowerCase()) !== -1) {
-                                sel.value = sel.options[i].value;
-                                city = sel.options[i].value;
-                                break;
+                    var geoResult = await window.api('/api/weather/location');
+                    if (geoResult.success) {
+                        window.state.geoLat = geoResult.lat;
+                        window.state.geoLon = geoResult.lon;
+                        city = geoResult.city || 'Chennai';
+                        
+                        /* Match city dropdown to ensure the backend gets a valid city name */
+                        var sel = document.getElementById('carbonCity');
+                        if (sel) {
+                            var matched = false;
+                            for (var i = 0; i < sel.options.length; i++) {
+                                var optVal = sel.options[i].value;
+                                if (city.toLowerCase().indexOf(optVal.toLowerCase()) !== -1 || 
+                                    optVal.toLowerCase().indexOf(city.toLowerCase()) !== -1) {
+                                    sel.value = optVal;
+                                    city = optVal;
+                                    matched = true;
+                                    break;
+                                }
+                            }
+                            if (!matched) {
+                                sel.value = 'Chennai';
+                                city = 'Chennai';
                             }
                         }
+
+                        pcCompleteStep(1, city + ' (' + geoResult.lat.toFixed(2) + ', ' + geoResult.lon.toFixed(2) + ')');
+                        var cityEl = document.getElementById('pc-param-city');
+                        if (cityEl) cityEl.textContent = city;
+
+                        /* Update hidden locCity */
+                        var lc = document.getElementById('locCity');
+                        if (lc) lc.textContent = city;
+                    } else {
+                        pcCompleteStep(1, 'Fallback: Chennai');
                     }
-
-                    pcCompleteStep(1, city + ' (' + geo.lat.toFixed(2) + ', ' + geo.lon.toFixed(2) + ')');
-                    var cityEl = document.getElementById('pc-param-city');
-                    if (cityEl) cityEl.textContent = city;
-
-                    /* Update hidden locCity/locTemp */
-                    var lc = document.getElementById('locCity');
-                    if (lc) lc.textContent = city;
-                } else {
-                    pcCompleteStep(1, 'Fallback: Chennai');
-                }
 
                 pcSetProgress(30);
 
@@ -805,9 +813,16 @@
                 pcSetProgress(40);
 
                 if (window.state.geoLat !== null && window.state.geoLon !== null) {
-                    var wth = await window.api('/api/weather/temperature?lat=' + window.state.geoLat + '&lon=' + window.state.geoLon);
-                    if (wth.success) {
-                        temp = Math.round(wth.temperature_c);
+                    try {
+                        var wth_url = '/api/weather/temperature?lat=' + window.state.geoLat + '&lon=' + window.state.geoLon;
+                        var wth = await window.api(wth_url);
+                        if (wth && wth.success) {
+                            temp = Math.round(wth.temperature_c);
+                        } else {
+                            console.warn("Temperature fetch returned unsuccessful", wth);
+                        }
+                    } catch (wthErr) {
+                        console.error("Temperature fetch error:", wthErr);
                     }
                 }
 
