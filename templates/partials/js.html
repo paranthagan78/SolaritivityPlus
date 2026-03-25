@@ -42,6 +42,7 @@
         // Mode-aware panel selection
         if (name === 'detect' && state.currentDetectMode === 'thermal') targetId = 'panel-detect-thermal';
         if (name === 'xai' && state.currentDetectMode === 'thermal') targetId = 'panel-xai-thermal';
+        if (name === 'summary' && state.currentDetectMode === 'thermal') targetId = 'panel-summary-thermal';
 
         const targetPanel = document.getElementById(targetId);
         if (targetPanel) targetPanel.classList.add('active');
@@ -103,7 +104,7 @@
             btnTH.style.color = '#000';
 
             // Hide specific tabs for Thermal mode
-            ['carbon', 'summary', 'chat'].forEach(id => {
+            ['carbon', 'chat'].forEach(id => {
                 const el = document.getElementById('tab-' + id);
                 if (el) el.style.display = 'none';
             });
@@ -139,7 +140,12 @@
         if (btn) btn.click();
     };
 
-    function nextTab(target) {
+    async function nextTab(target) {
+        // Special case for thermal summary
+        if (target === 'summary' && state.currentDetectMode === 'thermal') {
+            switchTab('summary', document.getElementById('tab-summary'));
+            return;
+        }
         const btn = document.querySelector(`.tab[onclick="switchTab('${target}',this)"]`);
         if (btn) btn.click();
     }
@@ -473,6 +479,8 @@
         try {
             const r = await apiForm('/api/thermal/predict', fd);
             if (r.success) {
+                state.thermalFilename = r.result_image.split('/').pop();
+                state.thermalDetections = [{ class_name: 'hotspot', confidence: 1.0, count: r.hotspot_count }];
                 setEl('thermalResult', `
         <div class="img-wrap" style="margin-bottom:.75rem">
           <img src="${r.result_image}?t=${Date.now()}" alt="Hotspot overlay"/>
@@ -492,6 +500,7 @@
 
     // ── SUMMARY ───────────────────────────────────────────────────────────────────
     let _lastSummaryText = '';
+    let _lastThermalSummaryText = '';
 
     async function runSummary() {
         const hero = document.getElementById('summaryHero');
@@ -522,6 +531,44 @@
             hero.style.display = 'flex';
             showToast(e.message, 'er');
         }
+    }
+
+    async function runThermalSummary() {
+        const hero = document.getElementById('thermalSummaryHero');
+        const overlay = document.getElementById('thermalSummaryOverlay');
+        const report = document.getElementById('thermalSummaryReport');
+
+        hero.style.display = 'none';
+        report.style.display = 'none';
+        overlay.style.display = 'flex';
+
+        try {
+            const payload = {
+                image_filename: state.thermalFilename || 'thermal_image',
+                detections: state.thermalDetections || [],
+                lime_features: state.thermalLimeFeatures || [] 
+            };
+            const r = await apiJSON('/api/summary/thermal/generate', payload);
+            overlay.style.display = 'none';
+            if (r.success) {
+                _lastThermalSummaryText = r.summary;
+                const container = document.getElementById('thermalReportSections');
+                container.innerHTML = parseReportToHTML(r.summary);
+                report.style.display = 'block';
+            } else {
+                hero.style.display = 'flex';
+                showToast(r.error || 'Thermal generation failed', 'er');
+            }
+        } catch (e) {
+            overlay.style.display = 'none';
+            hero.style.display = 'flex';
+            showToast(e.message, 'er');
+        }
+    }
+
+    function regenerateThermalSummary() {
+        document.getElementById('thermalSummaryReport').style.display = 'none';
+        runThermalSummary();
     }
 
     function regenerateSummary() {
@@ -686,12 +733,30 @@
     }
 
     // ── PDF ──────────────────────────────────────────────────────────────────────
+    function showPdfModalThermal() {
+        if (!_lastThermalSummaryText) {
+            showToast('Generate a thermal summary first', 'er');
+            return;
+        }
+        _tempPdfText = _lastThermalSummaryText; // Reuse downloadPDF logic or separate
+        _tempPdfType = 'thermal';
+        document.getElementById('pdfModal').style.display = 'flex';
+        document.getElementById('pdfFilenameInput').value = 'Thermal_Inspection_Report';
+        document.getElementById('pdfFilenameInput').focus();
+    }
+
+    let _tempPdfText = '';
+    let _tempPdfType = 'el';
+
     function showPdfModal() {
         if (!_lastSummaryText) {
             showToast('Generate a summary first before exporting PDF', 'er');
             return;
         }
+        _tempPdfText = _lastSummaryText;
+        _tempPdfType = 'el';
         document.getElementById('pdfModal').style.display = 'flex';
+        document.getElementById('pdfFilenameInput').value = 'SolarPV_Inspection_Report';
         document.getElementById('pdfFilenameInput').focus();
     }
 
@@ -701,6 +766,7 @@
 
     async function downloadPDF() {
         const filename = document.getElementById('pdfFilenameInput').value.trim() || 'SolarPV_Report';
+        const textToUse = _tempPdfText;
         closePdfModal();
         showToast('⏳ Generating PDF…', 'ok');
 
@@ -709,7 +775,7 @@
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ summary: _lastSummaryText, filename: filename }),
+                body: JSON.stringify({ summary: textToUse, filename: filename }),
             });
             if (resp.status === 401) { location.href = '/'; return; }
             if (!resp.ok) {

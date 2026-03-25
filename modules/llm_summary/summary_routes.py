@@ -2,6 +2,7 @@
 from flask import Blueprint, request, jsonify, send_file
 from auth import require_auth
 from .summary_engine import generate_summary, list_available_models
+from .thermal_summary_engine import generate_thermal_summary
 from .pdf_report import generate_pdf
 
 llm_bp = Blueprint("llm_summary", __name__, url_prefix="/api/summary")
@@ -14,6 +15,24 @@ def generate():
     filename_filter = body.get("filename") or body.get("image_filename")
     try:
         text = generate_summary(filename_filter)
+        return jsonify({"success": True, "summary": text}), 200
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 503
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@llm_bp.route("/thermal/generate", methods=["POST"])
+@require_auth
+def generate_thermal():
+    """Generate a summary for the thermal flow."""
+    body = request.get_json(silent=True) or {}
+    filename = body.get("image_filename", "thermal_image")
+    detections = body.get("detections", [])
+    lime_features = body.get("lime_features", [])
+
+    try:
+        text = generate_thermal_summary(filename, detections, lime_features)
         return jsonify({"success": True, "summary": text}), 200
     except ValueError as e:
         return jsonify({"success": False, "error": str(e)}), 503
