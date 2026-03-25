@@ -64,7 +64,7 @@ def generate_gradcam(image_path: str, out_path: str) -> str:
     orig = cv2.imread(image_path)
     cam_resized = cv2.resize(cam, (orig.shape[1], orig.shape[0]))
     heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
-    overlay = cv2.addWeighted(orig, 0.55, heatmap, 0.45, 0)
+    overlay = cv2.addWeighted(orig, 0.4, heatmap, 0.6, 0)
     cv2.imwrite(out_path, overlay)
 
     return out_path

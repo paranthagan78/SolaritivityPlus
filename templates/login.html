@@ -1,90 +1,297 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Solar PV — Login</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Solaritivity</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{--a:#f59e0b;--bg:#0f172a;--card:#1e293b;--bd:#334155;--tx:#e2e8f0;--mu:#94a3b8;--er:#ef4444;--ok:#22c55e}
-body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;color:var(--tx)}
-body::before{content:'';position:fixed;inset:0;z-index:0;background-image:linear-gradient(rgba(245,158,11,.04)1px,transparent 1px),linear-gradient(90deg,rgba(245,158,11,.04)1px,transparent 1px);background-size:40px 40px;animation:g 20s linear infinite}
-@keyframes g{to{background-position:40px 40px}}
-.card{position:relative;z-index:1;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:2.4rem 2rem;width:min(400px,92vw);box-shadow:0 24px 60px rgba(0,0,0,.5)}
-.logo{text-align:center;margin-bottom:2rem}
-.logo h1{font-size:1.15rem;font-weight:700;color:var(--a);margin-top:.5rem}
-.logo p{font-size:.78rem;color:var(--mu);margin-top:.25rem}
-label{font-size:.82rem;color:var(--mu);display:block;margin-bottom:.35rem}
-.iw{position:relative;margin-bottom:1.1rem}
-.iw input{width:100%;padding:.72rem 2.8rem .72rem .9rem;background:var(--bg);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:.95rem;letter-spacing:.08em;outline:none;transition:border-color .2s}
-.iw input:focus{border-color:var(--a)}
-.eye{position:absolute;right:.7rem;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mu)}
-.eye:hover{color:var(--tx)}
-.btn{width:100%;padding:.8rem;background:linear-gradient(135deg,var(--a),#d97706);border:none;border-radius:8px;color:#0f172a;font-size:.95rem;font-weight:700;cursor:pointer;transition:opacity .2s}
-.btn:hover{opacity:.88}.btn:disabled{opacity:.45;cursor:not-allowed}
-.bar{margin-top:.8rem;height:3px;background:var(--bd);border-radius:2px;overflow:hidden}
-.bar-fill{height:100%;background:var(--a);border-radius:2px;transition:width .4s,background .4s}
-.fb{min-height:1.3rem;font-size:.82rem;text-align:center;margin-top:.8rem}
-.fb.e{color:var(--er)}.fb.s{color:var(--ok)}
-@keyframes sp{to{transform:rotate(360deg)}}
-.sp{display:inline-block;width:14px;height:14px;border:2px solid #0f172a;border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:middle;margin-right:.35rem}
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400&display=swap');
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --orange:#ff8c00;
+    --orange-dim:rgba(255,140,0,0.18);
+    --orange-glow:rgba(255,140,0,0.06);
+  }
+
+  html,body{
+    width:100%;height:100%;
+    background:#000;
+    font-family:'Outfit',sans-serif;
+    overflow:hidden;
+  }
+
+  /* ── Canvas ── */
+  canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+  /* ── Center stage ── */
+  .stage{
+    position:fixed;inset:0;z-index:1;
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+    gap:1.6rem;
+  }
+
+  /* ── Brand ── */
+  .brand{
+    font-size:1.12rem;
+    font-weight:300;
+    letter-spacing:.55em;
+    color:rgba(255,140,0,0.45);
+    text-transform:uppercase;
+    user-select:none;
+  }
+
+  /* ── Label ── */
+  .label{
+    font-size:.68rem;
+    font-weight:300;
+    letter-spacing:.3em;
+    color:rgba(255,255,255,0.22);
+    text-transform:uppercase;
+    user-select:none;
+    margin-bottom:-.8rem;
+  }
+
+  /* ── Input row ── */
+  .row{
+    display:flex;
+    align-items:center;
+    gap:.7rem;
+  }
+
+  input[type="password"],input[type="text"]{
+    background:transparent;
+    border:none;
+    border-bottom:1px solid rgba(255,140,0,0.25);
+    outline:none;
+    color:#fff;
+    font-family:'Outfit',sans-serif;
+    font-size:1.3rem;
+    font-weight:200;
+    letter-spacing:.35em;
+    width:220px;
+    padding:.5rem .2rem;
+    caret-color:var(--orange);
+    transition:border-color .3s;
+    border-radius:0;
+    /* hide browser password bullets' extra spacing */
+    text-align:center;
+  }
+
+  input::placeholder{
+    letter-spacing:.2em;
+    color:rgba(255,255,255,0.1);
+    font-size:.9rem;
+  }
+
+  input:focus{
+    border-bottom-color:rgba(255,140,0,0.7);
+  }
+
+  /* ── Arrow button ── */
+  .go{
+    width:40px;height:40px;
+    border-radius:50%;
+    border:1px solid rgba(255,140,0,0.3);
+    background:transparent;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:border-color .3s, background .3s, transform .15s;
+    flex-shrink:0;
+  }
+
+  .go svg{
+    width:14px;height:14px;
+    stroke:rgba(255,140,0,0.6);
+    fill:none;
+    stroke-width:2;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+    transition:stroke .3s, transform .2s;
+  }
+
+  .go:hover{
+    border-color:rgba(255,140,0,0.8);
+    background:rgba(255,140,0,0.07);
+  }
+  .go:hover svg{stroke:var(--orange);transform:translateX(2px)}
+  .go:active{transform:scale(.92)}
+  .go.loading{pointer-events:none;}
+  .go.loading svg{animation:spin .6s linear infinite}
+
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Feedback ── */
+  .fb{
+    font-size:.62rem;
+    letter-spacing:.25em;
+    text-transform:uppercase;
+    color:rgba(255,140,0,0);
+    min-height:.9rem;
+    transition:color .3s, opacity .3s;
+    user-select:none;
+    text-align:center;
+  }
+  .fb.err{color:rgba(255,80,60,0.7)}
+  .fb.ok{color:rgba(255,140,0,0.7)}
+
+  /* ── Shake ── */
+  @keyframes shake{
+    0%,100%{transform:translateX(0)}
+    20%{transform:translateX(-6px)}
+    40%{transform:translateX(6px)}
+    60%{transform:translateX(-4px)}
+    80%{transform:translateX(4px)}
+  }
+  .shake{animation:shake .35s ease}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">
-    <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-      <rect x="2" y="13" width="48" height="26" rx="3" fill="#1e3a5f" stroke="#f59e0b" stroke-width="1.8"/>
-      <line x1="2" y1="26" x2="50" y2="26" stroke="#f59e0b" stroke-width="1.4"/>
-      <line x1="19" y1="13" x2="19" y2="39" stroke="#f59e0b" stroke-width="1.4"/>
-      <line x1="36" y1="13" x2="36" y2="39" stroke="#f59e0b" stroke-width="1.4"/>
-      <line x1="26" y1="39" x2="26" y2="47" stroke="#f59e0b" stroke-width="1.8"/>
-      <line x1="15" y1="47" x2="37" y2="47" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round"/>
-      <circle cx="42" cy="9" r="4" fill="#f59e0b" opacity=".85"/>
-    </svg>
-    <h1>Solar PV Defect Detection</h1>
-    <p>Enter your access passcode to continue</p>
-  </div>
-  <label for="pc">Access Passcode</label>
-  <div class="iw">
-    <input id="pc" type="password" placeholder="••••••••" autocomplete="current-password"/>
-    <button class="eye" id="ey" type="button" title="Toggle visibility">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-      </svg>
+
+<canvas id="c"></canvas>
+
+<div class="stage">
+  <div class="brand">Solaritivity</div>
+  <div class="label">Enter Passcode</div>
+  <div class="row">
+    <input id="pc" type="password" placeholder="· · · · · · · ·" autocomplete="current-password" autofocus/>
+    <button class="go" id="go" title="Unlock">
+      <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
   </div>
-  <button class="btn" id="lb" onclick="doLogin()">Unlock System</button>
-  <div class="bar"><div class="bar-fill" id="bf" style="width:100%"></div></div>
   <div class="fb" id="fb"></div>
 </div>
+
 <script>
-const MAX=5;let left=MAX;
-const pc=document.getElementById('pc'),fb=document.getElementById('fb'),lb=document.getElementById('lb'),bf=document.getElementById('bf');
-document.getElementById('ey').onclick=()=>{pc.type=pc.type==='password'?'text':'password'};
-pc.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
-(async()=>{try{const r=await fetch('/api/auth/status',{credentials:'include'});const d=await r.json();if(d.authenticated)location.href='/dashboard';}catch(e){}})();
-async function doLogin(){
-  const p=pc.value.trim();
-  if(!p){show('Enter your passcode.','e');return;}
-  lb.disabled=true;lb.innerHTML='<span class="sp"></span>Verifying…';
-  try{
-    const r=await fetch('/api/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:p})});
-    const d=await r.json();
-    if(d.success){show('✓ Access granted — loading…','s');setTimeout(()=>location.href='/dashboard',800);}
-    else{pc.value='';fail(d);}
-  }catch(e){show('Network error.','e');}
-  finally{if(!document.querySelector('.fb.s')){lb.disabled=false;lb.textContent='Unlock System';}}
+/* ═══════════════════════════════════════
+   Shooting stars
+═══════════════════════════════════════ */
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+let W,H;
+const resize=()=>{W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight};
+resize();window.addEventListener('resize',resize);
+
+const STAR_COUNT=320;
+const stars=[];
+
+function mkStar(){
+  // Start from top-right region, fall toward bottom-left
+  const edge=Math.random();
+  let x,y;
+  if(edge<.5){x=Math.random()*W*1.3;y=-10;}
+  else{x=W+10;y=Math.random()*H*.6;}
+  const spd=.4+Math.random()*1.2;
+  const len=18+Math.random()*55;
+  const alpha=.25+Math.random()*.55;
+  return{x,y,spd,len,alpha,dx:-spd*.62,dy:spd,life:1,decay:.004+Math.random()*.006};
 }
-function fail(d){
-  if(d.code==='LOCKED_OUT'){
-    show(`🔒 Locked out. Retry in ${d.retry_after}s.`,'e');lb.disabled=true;
-    let t=d.retry_after;const iv=setInterval(()=>{t--;show(`🔒 Locked out. Retry in ${t}s.`,'e');if(t<=0){clearInterval(iv);lb.disabled=false;left=MAX;upBar();}},1000);return;
+
+for(let i=0;i<STAR_COUNT;i++){
+  const s=mkStar();
+  // scatter them at start
+  s.x=Math.random()*W*1.4;
+  s.y=Math.random()*H*1.2;
+  stars.push(s);
+}
+
+function drawStars(){
+  ctx.clearRect(0,0,W,H);
+  for(let i=0;i<stars.length;i++){
+    const s=stars[i];
+    s.x+=s.dx;s.y+=s.dy;
+    s.life-=s.decay;
+    if(s.life<=0||s.x<-60||s.y>H+60){Object.assign(stars[i],mkStar());continue;}
+    const a=s.life*s.alpha;
+    const grd=ctx.createLinearGradient(s.x,s.y,s.x-s.dx*(s.len/s.spd),s.y-s.dy*(s.len/s.spd));
+    grd.addColorStop(0,`rgba(255,140,0,${a})`);
+    grd.addColorStop(1,`rgba(255,140,0,0)`);
+    ctx.beginPath();
+    ctx.moveTo(s.x,s.y);
+    ctx.lineTo(s.x-s.dx*(s.len/s.spd),s.y-s.dy*(s.len/s.spd));
+    ctx.strokeStyle=grd;
+    ctx.lineWidth=.45+Math.random()*.3;
+    ctx.stroke();
   }
-  if(typeof d.attempts_remaining==='number'){left=d.attempts_remaining;upBar();}
-  show(left>0?`❌ Wrong passcode. ${left} attempt${left!==1?'s':''} left.`:'⛔ Max attempts reached.','e');
+  requestAnimationFrame(drawStars);
 }
-function upBar(){const p=(left/MAX)*100;bf.style.width=p+'%';bf.style.background=p>60?'#f59e0b':p>30?'#f97316':'#ef4444';}
-function show(m,t){fb.textContent=m;fb.className='fb '+t;}
+drawStars();
+
+/* ═══════════════════════════════════════
+   Auth
+═══════════════════════════════════════ */
+const pcEl=document.getElementById('pc');
+const goEl=document.getElementById('go');
+const fbEl=document.getElementById('fb');
+
+let locked=false;
+
+async function doLogin(){
+  if(locked)return;
+  const p=pcEl.value.trim();
+  if(!p){shake();return;}
+  goEl.classList.add('loading');
+  goEl.querySelector('svg').innerHTML='<path d="M12 2a10 10 0 1 0 0 20"/>';
+  locked=true;
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({passcode:p})});
+    const d=await r.json();
+    if(d.success){
+      msg('✓','ok');
+      setTimeout(()=>location.href='/dashboard',800);
+    }else{
+      pcEl.value='';shake();
+      if(d.code==='LOCKED_OUT'){
+        msg(`locked · ${d.retry_after}s`,'err');
+        countdown(d.retry_after);
+      }else{
+        const rem=d.attempts_remaining;
+        msg(rem>0?`${rem} attempt${rem!==1?'s':''} remaining`:'max attempts','err');
+        locked=false;resetBtn();
+      }
+    }
+  }catch(e){msg('network error','err');locked=false;resetBtn();}
+}
+
+function countdown(t){
+  const iv=setInterval(()=>{
+    t--;
+    if(t<=0){clearInterval(iv);msg('','');locked=false;resetBtn();}
+    else msg(`locked · ${t}s`,'err');
+  },1000);
+}
+
+function resetBtn(){
+  goEl.classList.remove('loading');
+  goEl.querySelector('svg').innerHTML='<polyline points="9 18 15 12 9 6"/>';
+}
+
+function msg(m,cls){
+  fbEl.textContent=m;
+  fbEl.className='fb'+(cls?' '+cls:'');
+}
+
+function shake(){
+  pcEl.classList.remove('shake');
+  void pcEl.offsetWidth;
+  pcEl.classList.add('shake');
+  pcEl.addEventListener('animationend',()=>pcEl.classList.remove('shake'),{once:true});
+}
+
+goEl.addEventListener('click',doLogin);
+pcEl.addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+/* check if already logged in */
+(async()=>{
+  try{
+    const r=await fetch('/api/auth/status',{credentials:'include'});
+    const d=await r.json();
+    if(d.authenticated)location.href='/dashboard';
+  }catch(e){}
+})();
 </script>
 </body>
 </html>
