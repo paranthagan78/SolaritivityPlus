@@ -1,0 +1,940 @@
+<script>
+    'use strict';
+
+    // ── App state ────────────────────────────────────────────────────────────────
+    const state = {
+        detectFile: null,
+        xaiFile: null,
+        thermalFile: null,
+        detections: [],
+        filename: null,
+        imgSize: { width: 640, height: 640 },
+        chatHistory: [],
+        geoLat: null,
+        geoLon: null,
+        // Thermal extension
+        thermalDetectFile: null,
+        thermalDetections: [],
+        thermalFilename: null,
+        thermalImgSize: { width: 640, height: 640 },
+        currentDetectMode: 'el', // 'el' or 'thermal'
+    };
+    window.state = state;
+
+    // ── Tab switching ────────────────────────────────────────────────────────────
+    function positionGlider() {
+        const tabs = document.getElementById('navTabs');
+        if (!tabs) return;
+        const active = tabs.querySelector('.tab.active');
+        if (!active) return;
+        const tabsRect = tabs.getBoundingClientRect();
+        const activeRect = active.getBoundingClientRect();
+        const offset = activeRect.left - tabsRect.left;
+        tabs.style.setProperty('--glider-left', offset + 'px');
+        tabs.style.setProperty('--glider-width', activeRect.width + 'px');
+    }
+
+    function switchTab(name, btn) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+
+        let targetId = 'panel-' + name;
+        // Mode-aware panel selection
+        if (name === 'detect' && state.currentDetectMode === 'thermal') targetId = 'panel-detect-thermal';
+        if (name === 'xai' && state.currentDetectMode === 'thermal') targetId = 'panel-xai-thermal';
+        if (name === 'summary' && state.currentDetectMode === 'thermal') targetId = 'panel-summary-thermal';
+
+        const targetPanel = document.getElementById(targetId);
+        if (targetPanel) targetPanel.classList.add('active');
+
+        btn.classList.add('active');
+
+        // Reposition navbar glider
+        requestAnimationFrame(positionGlider);
+
+        // Toggle visibility of mode switcher (only on Detect tab)
+        const modeToggle = document.getElementById('modeToggleWrap');
+        if (modeToggle) {
+            if (name === 'detect') {
+                modeToggle.style.opacity = '1';
+                modeToggle.style.pointerEvents = 'all';
+                modeToggle.style.transform = 'translateX(0)';
+            } else {
+                modeToggle.style.opacity = '0';
+                modeToggle.style.pointerEvents = 'none';
+                modeToggle.style.transform = 'translateX(-10px)';
+            }
+        }
+
+        if (name === 'carbon' && typeof window.pcAutoRun === 'function') window.pcAutoRun();
+        if (name === 'xai') {
+            if (state.currentDetectMode === 'el' && typeof window.pxAutoRun === 'function') window.pxAutoRun();
+            if (state.currentDetectMode === 'thermal' && typeof window.txAutoRun === 'function') window.txAutoRun();
+        }
+    }
+
+    // Initialize glider on load
+    window.addEventListener('load', () => { setTimeout(positionGlider, 100); });
+    window.addEventListener('resize', positionGlider);
+
+    // ── Mode Switching ──────────────────────────────────────────────────────────
+    window.setDetectMode = function (mode) {
+        state.currentDetectMode = mode;
+        const glider = document.getElementById('modeGlider');
+        const btnEL = document.getElementById('modeBtnEL');
+        const btnTH = document.getElementById('modeBtnTH');
+
+        if (!glider) return;
+
+        if (mode === 'el') {
+            glider.style.left = '2px';
+            glider.style.width = '38px';
+            btnEL.style.color = '#000';
+            btnTH.style.color = '#888';
+
+            // Show all tabs
+            ['carbon', 'summary', 'chat'].forEach(id => {
+                const el = document.getElementById('tab-' + id);
+                if (el) el.style.display = 'flex';
+            });
+        } else {
+            glider.style.left = '42px';
+            glider.style.width = '78px';
+            btnEL.style.color = '#888';
+            btnTH.style.color = '#000';
+
+            // Hide specific tabs for Thermal mode
+            ['carbon', 'chat'].forEach(id => {
+                const el = document.getElementById('tab-' + id);
+                if (el) el.style.display = 'none';
+            });
+
+            // If an active tab is now hidden, switch to detect
+            const activeTab = document.querySelector('.tab.active');
+            if (activeTab && activeTab.style.display === 'none') {
+                const detectBtn = document.getElementById('tab-detect');
+                if (detectBtn) switchTab('detect', detectBtn);
+            }
+        }
+
+        // If on detect tab, swap panels immediately
+        const activeTab = document.querySelector('.tab.active');
+        if (activeTab && (activeTab.id === 'tab-detect' || activeTab.textContent.trim().toLowerCase() === 'detect')) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            const targetId = (mode === 'el') ? 'panel-detect' : 'panel-detect-thermal';
+            const targetPanel = document.getElementById(targetId);
+            if (targetPanel) targetPanel.classList.add('active');
+        }
+
+        // Force glider reposition after layout change
+        setTimeout(positionGlider, 50);
+    }
+
+
+    window.switchThermalPanel = function (name) {
+        // Find the pseudo-tab and click it
+        let tabName = name;
+        if (name === 'detect-thermal') tabName = 'detect';
+        if (name === 'xai-thermal') tabName = 'xai';
+        const btn = document.querySelector(`.tab[onclick*="'${tabName}'"]`);
+        if (btn) btn.click();
+    };
+
+    async function nextTab(target) {
+        // Special case for thermal summary
+        if (target === 'summary' && state.currentDetectMode === 'thermal') {
+            switchTab('summary', document.getElementById('tab-summary'));
+            return;
+        }
+        const btn = document.querySelector(`.tab[onclick="switchTab('${target}',this)"]`);
+        if (btn) btn.click();
+    }
+
+    // ── Session timer ────────────────────────────────────────────────────────────
+    (async () => {
+        try {
+            const d = await api('/api/auth/status');
+            if (!d.authenticated) { location.href = '/'; return; }
+            let rem = d.session_remaining || 3600;
+            const el = document.getElementById('sessionTimer');
+            const tick = () => {
+                if (rem <= 0) { location.href = '/'; return; }
+                const m = Math.floor(rem / 60), s = rem % 60;
+                el.textContent = `⏱ ${m}:${String(s).padStart(2, '0')}`;
+                rem--;
+            };
+            tick();
+            setInterval(tick, 1000);
+        } catch (e) { location.href = '/'; }
+    })();
+
+    async function logout() {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+        location.href = '/';
+    }
+
+    // ── Weather / geo auto-fill ──────────────────────────────────────────────────
+    async function fetchWeather() {
+        setText('locCity', '…'); setText('locTemp', '… °C');
+        try {
+            const geo = await api('/api/weather/location');
+            if (!geo.success) throw new Error(geo.error);
+            state.geoLat = geo.lat;
+            state.geoLon = geo.lon;
+            setText('locCity', geo.city || 'Unknown');
+
+            // Match city dropdown
+            const sel = document.getElementById('carbonCity');
+            if (sel) {
+                for (const opt of sel.options) {
+                    const val = opt.value.toLowerCase();
+                    const cty = (geo.city || '').toLowerCase();
+                    if (cty.includes(val) || val.includes(cty)) {
+                        sel.value = opt.value; 
+                        break;
+                    }
+                }
+            }
+
+            // Fetch live temperature
+            const wth = await api(`/api/weather/temperature?lat=${geo.lat}&lon=${geo.lon}`);
+            if (wth.success) {
+                const t = Math.round(wth.temperature_c);
+                setText('locTemp', `${t} °C`);
+                document.getElementById('carbonTemp').value = t;
+            }
+        } catch (e) {
+            setText('locCity', 'Unavailable');
+            setText('locTemp', '— °C');
+        }
+    }
+
+    // ── Drag & drop (detect zone) ────────────────────────────────────────────────
+    function dzDrag(e, on) {
+        e.preventDefault();
+        document.getElementById('dz').classList.toggle('over', on);
+    }
+    function dzDrop(e) {
+        e.preventDefault();
+        document.getElementById('dz').classList.remove('over');
+        const f = e.dataTransfer.files[0];
+        if (f) { state.detectFile = f; showPreview('detectPreview', f); toggleDetectBtns(true); }
+    }
+
+    // ── DETECT ───────────────────────────────────────────────────────────────────
+    function previewDetect(input) {
+        state.detectFile = input.files[0];
+        if (!state.detectFile) return;
+        showPreview('detectPreview', state.detectFile);
+        toggleDetectBtns(true);
+    }
+
+    function toggleDetectBtns(on) {
+        document.getElementById('detectBtn').disabled = !on;
+        document.getElementById('integrityBtn').disabled = !on;
+    }
+
+    window.clearDetectFile = function () {
+        state.detectFile = null;
+        state.filename = null;
+        state.detections = [];
+
+        // Reset UI
+        const dz = document.getElementById('dz');
+        const prev = document.getElementById('detectPreview');
+        const btn = document.getElementById('detectBtn');
+        const res = document.getElementById('pd-result-img-wrap');
+        const ph = document.getElementById('pd-result-placeholder');
+        const dot = document.getElementById('pd-result-dot');
+        const info = document.getElementById('pd-result-info');
+        const table = document.getElementById('detectionsTableCard');
+        const badge = document.getElementById('csvSavedBadge');
+
+        if (dz) dz.style.display = 'flex';
+        if (prev) {
+            prev.style.display = 'none';
+            prev.innerHTML = '';
+        }
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = '0.38';
+        }
+
+        // Clear result side
+        if (res) {
+            res.style.display = 'none';
+            res.innerHTML = '';
+        }
+        if (ph) ph.style.display = 'flex';
+        if (dot) {
+            dot.style.background = '#d0d0c8';
+            dot.style.animation = 'none';
+        }
+        if (info) info.style.display = 'none';
+        if (table) table.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+
+        const fileInput = document.getElementById('detectFile');
+        if (fileInput) fileInput.value = '';
+
+        // Clear alert notes
+        const carbonNote = document.getElementById('carbonNote');
+        if (carbonNote) carbonNote.style.display = 'none';
+
+        // Auto-refresh to reset all panels and state
+        location.reload();
+    };
+
+    async function runIntegrity() {
+        if (!state.detectFile) return;
+        const fd = new FormData();
+        fd.append('images', state.detectFile);
+        document.getElementById('integrityResult').innerHTML = '<span class="spinner"></span>';
+        try {
+            const r = await apiForm('/api/integrity/check', fd);
+            const res = r.results?.[0];
+            if (res) {
+                const ok = res.valid;
+                const pct = (res.confidence * 100).toFixed(0);
+                document.getElementById('integrityResult').innerHTML =
+                    `<span class="badge ${ok ? 'badge-ok' : 'badge-er'}">${ok ? '✓ Valid' : '✗ Invalid'}%</span>`;
+            }
+        } catch (e) {
+            document.getElementById('integrityResult').innerHTML =
+                '<span class="badge badge-er">Error</span>';
+        }
+    }
+
+    async function runDetect() {
+        if (!state.detectFile) return;
+        const fd = new FormData();
+        fd.append('image', state.detectFile);
+        setEl('detectResult', loadingHtml('Running YOLO detection…'));
+        setDisabled('detectBtn', true);
+        try {
+            const r = await apiForm('/api/detect/run', fd);
+            if (r.success) {
+                state.detections = r.detections;
+                state.filename = r.filename;
+                state.imgSize = r.image_size;
+                renderDetectResult(r);
+                setAlert('carbonNote',
+                    `✓ Detection complete — ${r.count} defect(s) found. Go to Carbon tab to predict emission.`,
+                    'ok');
+            } else {
+                setEl('detectResult', alertHtml(r.error, 'er'));
+            }
+        } catch (e) {
+            setEl('detectResult', alertHtml(e.message, 'er'));
+        }
+        setDisabled('detectBtn', false);
+    }
+
+    const COLORS = {
+        black_core: '#e74c3c', crack: '#e67e22',
+        finger: '#f1c40f', star_crack: '#9b59b6', thick_line: '#1abc9c',
+    };
+
+    function renderDetectResult(r) {
+        const stats = `
+    <div class="grid3" style="margin-bottom:.8rem">
+      <div class="stat">
+        <div class="val">${r.count}</div>
+        <div class="lbl">Defects Found</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="font-size:1rem">${r.image_size.width}×${r.image_size.height}</div>
+        <div class="lbl">Resolution (px)</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="color:${r.count > 0 ? 'var(--er)' : 'var(--ok)'};font-size:1.1rem">
+          ${r.count > 0 ? 'DEFECTIVE' : 'CLEAN'}
+        </div>
+        <div class="lbl">Panel Status</div>
+      </div>
+    </div>`;
+
+        const img = `
+    <div class="img-wrap" style="margin-bottom:.8rem">
+      <img src="${r.result_image}?t=${Date.now()}" alt="Detection result"/>
+    </div>`;
+
+        const list = r.detections.length
+            ? r.detections.map(d => `
+        <div class="det-item">
+          <div class="det-info">
+            <div class="det-dot" style="background:${COLORS[d.class_name] || '#aaa'}"></div>
+            <strong>${d.class_name}</strong>
+          </div>
+          <div class="det-meta">
+            <span class="badge badge-wa">${(d.confidence * 100).toFixed(1)}%</span>
+            <span style="font-size:.69rem;color:var(--mu)">AR ${(d.area_ratio * 100).toFixed(2)}%</span>
+          </div>
+        </div>`).join('')
+            : '<div style="color:var(--ok);font-size:.83rem;padding:.5rem 0">✓ No defects detected — panel appears clean.</div>';
+
+        setEl('detectResult', stats + img + list);
+
+        // Table
+        document.getElementById('detectionsTableCard').style.display = 'block';
+        document.getElementById('csvSavedBadge').style.display = 'inline-block';
+        document.getElementById('detectionsBody').innerHTML = r.detections.length
+            ? r.detections.map(d =>
+                `<tr>
+          <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[d.class_name] || '#aaa'};margin-right:.4rem"></span>${d.class_name}</td>
+          <td>${(d.confidence * 100).toFixed(2)}%</td>
+          <td style="font-family:monospace;font-size:.72rem">${d.bbox.join(', ')}</td>
+          <td>${(d.area_ratio * 100).toFixed(3)}%</td>
+        </tr>`).join('')
+            : '<tr><td colspan="4" style="color:var(--ok);text-align:center">No defects</td></tr>';
+    }
+
+    // ── CARBON ───────────────────────────────────────────────────────────────────
+    async function runCarbon() {
+        setEl('carbonResult', loadingHtml('Predicting CO₂ emission…'));
+        try {
+            const r = await apiJSON('/api/carbon/predict', {
+                detections: state.detections,
+                image_width: state.imgSize.width,
+                image_height: state.imgSize.height,
+                city: document.getElementById('carbonCity').value,
+                panel_power: +document.getElementById('carbonPower').value,
+                ambient_temp: +document.getElementById('carbonTemp').value,
+                irradiance: +document.getElementById('carbonIrr').value,
+                filename: state.filename || 'unknown',
+            });
+            if (r.success) renderCarbonResult(r);
+            else setEl('carbonResult', alertHtml(r.error, 'er'));
+        } catch (e) { setEl('carbonResult', alertHtml(e.message, 'er')); }
+    }
+
+    function renderCarbonResult(r) {
+        const rows = [
+            ['Dominant Defect', `<strong>${r.dominant_defect}</strong>`],
+            ['City', r.city],
+            ['Emission Factor', r.emission_factor],
+            ['Panel Power', `${r.panel_power_w} W`],
+            ['Ambient Temp', `${r.ambient_temp_c} °C`],
+            ['Irradiance', `${r.irradiance_w_m2} W/m²`],
+            ['Defects Counted', r.num_defects],
+        ].map(([k, v]) =>
+            `<div style="display:flex;justify-content:space-between;padding:.3rem 0;border-bottom:1px solid var(--bd)">
+       <span style="color:var(--mu)">${k}</span><span>${v}</span>
+     </div>`).join('');
+
+        setEl('carbonResult', `
+    <div class="grid2" style="margin-bottom:.85rem">
+      <div class="stat">
+        <div class="val">${r.co2_kg_per_year}</div>
+        <div class="lbl">CO₂ kg / year</div>
+      </div>
+      <div class="stat">
+        <div class="val">${r.total_degradation_pct}%</div>
+        <div class="lbl">Panel Degradation</div>
+      </div>
+    </div>
+    <div style="font-size:.8rem">${rows}</div>
+    <div style="font-size:.7rem;color:var(--mu);margin-top:.6rem">✓ Results saved to carbon.csv</div>
+  `);
+    }
+
+    // ── XAI ──────────────────────────────────────────────────────────────────────
+    function previewXAI(input) {
+        state.xaiFile = input.files[0];
+        if (!state.xaiFile) return;
+        showPreview('xaiPreview', state.xaiFile);
+        setDisabled('xaiBtn', false);
+    }
+
+    async function runXAI() {
+        if (!state.xaiFile) return;
+        setEl('xaiResult', loadingHtml('Generating GradCAM heatmap…'));
+        setDisabled('xaiBtn', true);
+        const fd = new FormData();
+        fd.append('image', state.xaiFile);
+        try {
+            const r = await apiForm('/api/xai/gradcam', fd);
+            setEl('xaiResult', r.success
+                ? `<div class="img-wrap" style="margin-bottom:.6rem">
+           <img src="${r.explanation_image}?t=${Date.now()}" alt="GradCAM heatmap"/>
+         </div>
+         <div style="font-size:.72rem;color:var(--mu);text-align:center;line-height:1.5">
+           🔴 Warm regions = high model activation (features driving prediction)<br>
+           🔵 Cool regions = low activation
+         </div>`
+                : alertHtml(r.error, 'er'));
+        } catch (e) { setEl('xaiResult', alertHtml(e.message, 'er')); }
+        setDisabled('xaiBtn', false);
+    }
+
+    // ── THERMAL ───────────────────────────────────────────────────────────────────
+    function previewThermal(input) {
+        state.thermalFile = input.files[0];
+        if (!state.thermalFile) return;
+        showPreview('thermalPreview', state.thermalFile);
+        setDisabled('thermalBtn', false);
+    }
+
+    async function runThermal() {
+        if (!state.thermalFile) return;
+        setEl('thermalResult', loadingHtml('Detecting hotspots…'));
+        setDisabled('thermalBtn', true);
+        const fd = new FormData();
+        fd.append('image', state.thermalFile);
+        try {
+            const r = await apiForm('/api/thermal/predict', fd);
+            if (r.success) {
+                state.thermalFilename = r.result_image.split('/').pop();
+                state.thermalDetections = [{ class_name: 'hotspot', confidence: 1.0, count: r.hotspot_count }];
+                setEl('thermalResult', `
+        <div class="img-wrap" style="margin-bottom:.75rem">
+          <img src="${r.result_image}?t=${Date.now()}" alt="Hotspot overlay"/>
+        </div>
+        <div class="stat">
+          <div class="val">${r.hotspot_count}</div>
+          <div class="lbl">Hotspots Detected</div>
+        </div>
+        ${r.note ? `<div style="font-size:.71rem;color:var(--mu);margin-top:.55rem">${r.note}</div>` : ''}
+      `);
+            } else {
+                setEl('thermalResult', alertHtml(r.error, 'er'));
+            }
+        } catch (e) { setEl('thermalResult', alertHtml(e.message, 'er')); }
+        setDisabled('thermalBtn', false);
+    }
+
+    // ── SUMMARY ───────────────────────────────────────────────────────────────────
+    let _lastSummaryText = '';
+    let _lastThermalSummaryText = '';
+
+    async function runSummary() {
+        const hero = document.getElementById('summaryHero');
+        const overlay = document.getElementById('summaryOverlay');
+        const report = document.getElementById('summaryReport');
+        const nextBtn = document.getElementById('summaryNextBtn');
+
+        // Show overlay
+        hero.style.display = 'none';
+        report.style.display = 'none';
+        nextBtn.style.display = 'none';
+        overlay.style.display = 'flex';
+
+        try {
+            const r = await apiJSON('/api/summary/generate', {});
+            overlay.style.display = 'none';
+            if (r.success) {
+                _lastSummaryText = r.summary;
+                renderReport(r.summary);
+                report.style.display = 'block';
+                nextBtn.style.display = 'flex';
+            } else {
+                hero.style.display = 'flex';
+                showToast(r.error || 'Generation failed', 'er');
+            }
+        } catch (e) {
+            overlay.style.display = 'none';
+            hero.style.display = 'flex';
+            showToast(e.message, 'er');
+        }
+    }
+
+    async function runThermalSummary() {
+        const hero = document.getElementById('thermalSummaryHero');
+        const overlay = document.getElementById('thermalSummaryOverlay');
+        const report = document.getElementById('thermalSummaryReport');
+
+        hero.style.display = 'none';
+        report.style.display = 'none';
+        overlay.style.display = 'flex';
+
+        try {
+            const payload = {
+                image_filename: state.thermalFilename || 'thermal_image',
+                detections: state.thermalDetections || [],
+                lime_features: state.thermalLimeFeatures || [] 
+            };
+            const r = await apiJSON('/api/summary/thermal/generate', payload);
+            overlay.style.display = 'none';
+            if (r.success) {
+                _lastThermalSummaryText = r.summary;
+                const container = document.getElementById('thermalReportSections');
+                container.innerHTML = parseReportToHTML(r.summary);
+                report.style.display = 'block';
+            } else {
+                hero.style.display = 'flex';
+                showToast(r.error || 'Thermal generation failed', 'er');
+            }
+        } catch (e) {
+            overlay.style.display = 'none';
+            hero.style.display = 'flex';
+            showToast(e.message, 'er');
+        }
+    }
+
+    function regenerateThermalSummary() {
+        document.getElementById('thermalSummaryReport').style.display = 'none';
+        runThermalSummary();
+    }
+
+    function regenerateSummary() {
+        const report = document.getElementById('summaryReport');
+        const nextBtn = document.getElementById('summaryNextBtn');
+        report.style.display = 'none';
+        nextBtn.style.display = 'none';
+        runSummary();
+    }
+
+    function renderReport(text) {
+        const container = document.getElementById('reportSections');
+        container.innerHTML = parseReportToHTML(text);
+    }
+
+    function parseReportToHTML(raw) {
+        // Clean up raw text
+        let text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+        // Remove the ====== header/footer markers
+        text = text.replace(/^={3,}.*$/gm, '');
+        text = text.replace(/^-{3,}\s*$/gm, '');
+
+        // Split into sections: "SECTION N:" pattern
+        const sectionPattern = /(?:^|\n)\s*(?:SECTION\s+\d+\s*:\s*)(.*)/gi;
+        const sectionHeaders = [];
+        let match;
+        while ((match = sectionPattern.exec(text)) !== null) {
+            sectionHeaders.push({ index: match.index, title: match[1].trim() });
+        }
+
+        // If no sections found, render as a single block
+        if (sectionHeaders.length === 0) {
+            return `<div class="report-section">${formatBlock(text)}</div>`;
+        }
+
+        let html = '';
+
+        // Grab any content before the first section (report title, etc.)
+        const preamble = text.substring(0, sectionHeaders[0].index).trim();
+        if (preamble && preamble.replace(/[\s=\-]/g, '').length > 10) {
+            html += `<div class="report-section"><h2>Report Overview</h2>${formatBlock(preamble)}</div>`;
+        }
+
+        // Render each section
+        for (let i = 0; i < sectionHeaders.length; i++) {
+            const startMatch = text.indexOf('\n', sectionHeaders[i].index + 1);
+            const start = startMatch !== -1 ? startMatch : sectionHeaders[i].index;
+            const end = i + 1 < sectionHeaders.length ? sectionHeaders[i + 1].index : text.length;
+            const body = text.substring(start, end).trim();
+            const title = sectionHeaders[i].title
+                .replace(/^SECTION\s+\d+\s*:\s*/i, '')
+                .replace(/[=\-]+$/g, '')
+                .trim();
+            html += `<div class="report-section"><h2>${escHtml(title)}</h2>${formatBlock(body)}</div>`;
+        }
+
+        // Check for END OF REPORT — omit any trailing content
+        return html;
+    }
+
+    function formatBlock(block) {
+        const lines = block.split('\n');
+        let html = '';
+        let inList = false;
+        let inDefectBlock = false;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            const trimmed = line.trim();
+
+            // Skip empty lines or pure separator lines
+            if (!trimmed || /^[=\-]{3,}$/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                continue;
+            }
+
+            // Skip "SOLAR PANEL INSPECTION REPORT" or "Image Reference:" lines or "END OF REPORT"
+            if (/^(SOLAR PANEL INSPECTION REPORT|Image Reference:|END OF REPORT|Rules:)/i.test(trimmed)) continue;
+
+            // Defect block start/end
+            if (/^\[DEFECT BLOCK (START|END)\]/i.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                if (trimmed.includes('START')) {
+                    html += '<div class="defect-block">';
+                    inDefectBlock = true;
+                } else {
+                    html += '</div>';
+                    inDefectBlock = false;
+                }
+                continue;
+            }
+
+            // Sub-headings inside sections (e.g., "4a.", "Defect Name:", "Root Causes:", etc.)
+            if (/^(?:\d+[a-z]?[\.\)]\s+|(?:Defect Name|What This Defect Is|Detection Evidence|Root Causes|Consequences|Defect Priority|Immediate Actions|Short-Term Actions|Preventive|Carbon Emission Reduction|Risk Level|Risk Justification|CO2 Emission|Power and Efficiency|Operational and Financial)\b)/i.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<h3>${inlineFormat(trimmed)}</h3>`;
+                continue;
+            }
+
+            // Field labels inside defect blocks (e.g., "- Number of detections:")
+            if (inDefectBlock && /^[A-Z][A-Za-z\s]+:$/.test(trimmed)) {
+                if (inList) { html += '</ul>'; inList = false; }
+                html += `<div class="field-label">${escHtml(trimmed)}</div>`;
+                continue;
+            }
+
+            // List items starting with - 
+            if (/^\s*[-•]\s+/.test(line)) {
+                if (!inList) { html += '<ul>'; inList = true; }
+                const content = trimmed.replace(/^[-•]\s+/, '');
+                html += `<li>${inlineFormat(content)}</li>`;
+                continue;
+            }
+
+            // Regular paragraph line
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<p>${inlineFormat(trimmed)}</p>`;
+        }
+
+        if (inList) html += '</ul>';
+        if (inDefectBlock) html += '</div>';
+        return html;
+    }
+
+    function inlineFormat(text) {
+        let s = escHtml(text);
+        // Bold: **text** or __text__
+        s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+        // Italic: *text* or _text_
+        s = s.replace(/(?<!\*)\*([^*]+?)\*(?!\*)/g, '<em>$1</em>');
+        s = s.replace(/(?<!_)_([^_]+?)_(?!_)/g, '<em>$1</em>');
+        return s;
+    }
+
+    function escHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    // ── INGEST ──────────────────────────────────────────────────────────────────
+    async function runIngest() {
+        const btn = document.getElementById('ingestBtn');
+        const btn2 = document.getElementById('ingestBtn2');
+        const origHTML = btn ? btn.innerHTML : '';
+        const origHTML2 = btn2 ? btn2.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="pill-spinner"></span><span class="pill-text">Ingesting…</span>'; }
+        if (btn2) { btn2.disabled = true; btn2.innerHTML = '<span class="pill-spinner"></span><span class="pill-text">…</span>'; }
+
+        try {
+            const r = await apiJSON('/api/chat/ingest', {});
+            showToast(r.success ? '✓ Data ingested into ChromaDB successfully' : (r.error || 'Ingestion failed'),
+                r.success ? 'ok' : 'er');
+        } catch (e) {
+            showToast(e.message, 'er');
+        }
+
+        if (btn) { btn.disabled = false; btn.innerHTML = origHTML; }
+        if (btn2) { btn2.disabled = false; btn2.innerHTML = origHTML2; }
+    }
+
+    // ── PDF ──────────────────────────────────────────────────────────────────────
+    function showPdfModalThermal() {
+        if (!_lastThermalSummaryText) {
+            showToast('Generate a thermal summary first', 'er');
+            return;
+        }
+        _tempPdfText = _lastThermalSummaryText; // Reuse downloadPDF logic or separate
+        _tempPdfType = 'thermal';
+        document.getElementById('pdfModal').style.display = 'flex';
+        document.getElementById('pdfFilenameInput').value = 'Thermal_Inspection_Report';
+        document.getElementById('pdfFilenameInput').focus();
+    }
+
+    let _tempPdfText = '';
+    let _tempPdfType = 'el';
+
+    function showPdfModal() {
+        if (!_lastSummaryText) {
+            showToast('Generate a summary first before exporting PDF', 'er');
+            return;
+        }
+        _tempPdfText = _lastSummaryText;
+        _tempPdfType = 'el';
+        document.getElementById('pdfModal').style.display = 'flex';
+        document.getElementById('pdfFilenameInput').value = 'SolarPV_Inspection_Report';
+        document.getElementById('pdfFilenameInput').focus();
+    }
+
+    function closePdfModal() {
+        document.getElementById('pdfModal').style.display = 'none';
+    }
+
+    async function downloadPDF() {
+        const filename = document.getElementById('pdfFilenameInput').value.trim() || 'SolarPV_Report';
+        const textToUse = _tempPdfText;
+        closePdfModal();
+        showToast('⏳ Generating PDF…', 'ok');
+
+        try {
+            const resp = await fetch('/api/summary/pdf', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ summary: textToUse, filename: filename }),
+            });
+            if (resp.status === 401) { location.href = '/'; return; }
+            if (!resp.ok) {
+                const err = await resp.json();
+                showToast(err.error || 'PDF generation failed', 'er');
+                return;
+            }
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename.endsWith('.pdf') ? filename : filename + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            showToast('✓ PDF downloaded successfully', 'ok');
+        } catch (e) {
+            showToast('PDF error: ' + e.message, 'er');
+        }
+    }
+
+    // ── Toast ────────────────────────────────────────────────────────────────────
+    function showToast(msg, type) {
+        const toast = document.getElementById('summaryToast');
+        toast.textContent = msg;
+        toast.className = `summary-toast toast-${type}`;
+        toast.style.display = 'block';
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => { toast.style.display = 'none'; }, 4000);
+    }
+
+    // ── CHAT ─────────────────────────────────────────────────────────────────────
+    function toggleChatWindow() {
+        const widget = document.getElementById('chat-widget');
+        widget.classList.toggle('chat-widget-hidden');
+        if (!widget.classList.contains('chat-widget-hidden')) {
+            document.getElementById('chatInput').focus();
+        }
+    }
+
+    function sendQuickChat(question) {
+        document.getElementById('quickQuestions').style.display = 'none';
+        const input = document.getElementById('chatInput');
+        input.value = question;
+        sendChat();
+    }
+
+    async function sendChat() {
+        const input = document.getElementById('chatInput');
+        const q = input.value.trim();
+        if (!q) return;
+        if (!q) return;
+        input.value = '';
+        input.disabled = true;
+
+        appendMsg(q, 'user');
+        state.chatHistory.push({ role: 'user', content: q });
+
+        const thinking = appendMsg('Thinking...', 'bot thinking');
+        document.getElementById('quickQuestions').style.display = 'none'; // hide chips explicitly here too
+
+        try {
+            const payload = {
+                question: q,
+                history: state.chatHistory.slice(-8),
+            };
+
+            // Contextually inject whichever image the user is currently working on
+            if (state.currentDetectMode === 'el' && state.filename) {
+                payload.image_filename = state.filename;
+            } else if (state.currentDetectMode === 'thermal' && state.thermalFilename) {
+                payload.image_filename = state.thermalFilename;
+            }
+
+            const r = await apiJSON('/api/chat/query', payload);
+            const ans = r.success ? r.answer : `Error: ${r.error}`;
+            thinking.className = 'msg bot';
+            thinking.textContent = ans;
+            state.chatHistory.push({ role: 'model', content: ans });
+        } catch (e) {
+            thinking.className = 'msg bot';
+            thinking.textContent = `Error: ${e.message}`;
+        }
+        input.disabled = false;
+        input.focus();
+        scrollChat();
+    }
+
+    function appendMsg(text, cls) {
+        const box = document.getElementById('chatBox');
+        const div = document.createElement('div');
+        div.className = `msg ${cls}`;
+        div.textContent = text;
+        box.appendChild(div);
+        scrollChat();
+        return div;
+    }
+
+    function scrollChat() {
+        const box = document.getElementById('chatBox');
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function clearChat() {
+        state.chatHistory = [];
+        document.getElementById('chatBox').innerHTML =
+            '<div class="msg bot">Chat cleared. What would you like to know?</div>';
+    }
+
+    // ── API helpers ───────────────────────────────────────────────────────────────
+    async function api(url, opts = {}) {
+        opts.credentials = 'include';
+        const r = await fetch(url, opts);
+        if (r.status === 401) { location.href = '/'; throw new Error('Unauthorized'); }
+        return r.json();
+    }
+    async function apiForm(url, fd) { return api(url, { method: 'POST', body: fd }); }
+    async function apiJSON(url, body) {
+        return api(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+    }
+
+    // ── DOM helpers ───────────────────────────────────────────────────────────────
+    function setEl(id, html) { document.getElementById(id).innerHTML = html; }
+    function setText(id, txt) { document.getElementById(id).textContent = txt; }
+    function setDisabled(id, val) { document.getElementById(id).disabled = val; }
+
+    function showPreview(containerId, file) {
+        setEl(containerId,
+            `<div class="img-wrap"><img src="${URL.createObjectURL(file)}" alt="Preview"/></div>`);
+    }
+
+    function loadingHtml(msg) {
+        return `<div style="text-align:center;padding:2.5rem 1rem;color:var(--mu)">
+    <span class="spinner"></span> ${msg}
+  </div>`;
+    }
+
+    function alertHtml(msg, type) {
+        const cls = { ok: 'alert-ok', er: 'alert-er', wa: 'alert-wa' };
+        return `<div class="alert ${cls[type] || ''}">${msg}</div>`;
+    }
+
+    function setStatus(id, msg, type) {
+        setEl(id, alertHtml(msg, type));
+    }
+
+    function setAlert(id, msg, type) {
+        const el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = `alert alert-${type}`;
+    }
+</script>

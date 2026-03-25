@@ -48,6 +48,20 @@ def create_app() -> Flask:
                chatbot_bp, weather_bp):
         app.register_blueprint(bp)
 
+    # ── Eagerly load DistilBERT at startup ────────────────────────────────
+    # THIS IS THE KEY FIX for the teammate problem.
+    #
+    # Without this, the model loads lazily on the first request. On a machine
+    # that hasn't downloaded the model yet (~67 MB), the download happens during
+    # that first request — and every request that arrives before the download
+    # completes silently falls back to rule-based sentiment instead of DistilBERT.
+    #
+    # With this call, the model is fully downloaded, loaded, and warmed up
+    # BEFORE Flask starts serving requests. Every machine gets DistilBERT
+    # from request #1, regardless of whether the model was pre-cached.
+    from modules.chatbot.sentiment import warmup_sentiment_model
+    warmup_sentiment_model()
+
     # ── Static file routes ─────────────────────────────────────────────────
     @app.route("/uploads/<path:filename>")
     def serve_upload(filename):
@@ -76,9 +90,23 @@ def create_app() -> Flask:
         return render_template("dashboard.html")
 
     # ── Health check ───────────────────────────────────────────────────────
+    # Now includes sentiment model status so you can verify DistilBERT loaded
+    # correctly on any machine by hitting GET /api/health
     @app.route("/api/health")
     def health():
-        return jsonify({"status": "ok", "service": "Solar PV Defect Detection"}), 200
+        from modules.chatbot.sentiment import _model_loaded, _model_failed
+        if _model_loaded:
+            sentiment_status = "distilbert_ready"
+        elif _model_failed:
+            sentiment_status = "rule_based_fallback"
+        else:
+            sentiment_status = "not_loaded"
+
+        return jsonify({
+            "status":          "ok",
+            "service":         "Solar PV Defect Detection",
+            "sentiment_model": sentiment_status,
+        }), 200
 
     # ── Error handlers ─────────────────────────────────────────────────────
     @app.errorhandler(404)

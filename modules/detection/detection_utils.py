@@ -19,9 +19,13 @@ def draw_boxes(image_path: str, detections: list, out_path: str) -> str:
     except Exception:
         font = ImageFont.load_default()
 
+    # Blackish Brown Bounding Box
+    BB_COLOR = "#3D2B1F"
+
     for det in detections:
         x1, y1, x2, y2 = det["bbox"]
-        color = COLOR_MAP.get(det["class_name"], "#00ff00")
+        # Use specific color map if available, else default to blackish brown
+        color = COLOR_MAP.get(det["class_name"], BB_COLOR)
         for i in range(3):
             draw.rectangle([x1 - i, y1 - i, x2 + i, y2 + i], outline=color)
         label = f"{det['class_name']} {det['confidence']:.0%}"

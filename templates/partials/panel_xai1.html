@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GradCAM Explainability · XAI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #8b5cf6;
+      --purple-soft: #a78bfa;
+      --green: #22c55e;
+      --red: #ef4444;
+      --orange: #f97316;
+      --blue: #3b82f6;
+      --cyan: #06b6d4;
+      --bg: #000000;
+      --card-bg: #000000;
+      --border: #111111;
+      --border-inner: #1a1a24;
+      --text-muted: #888;
+      --text-dim: #555;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: #fff;
+      min-height: 100vh;
+      padding: 1.8rem 2rem;
+      overflow-x: hidden;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(22px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes dash {
+      0%   { stroke-dashoffset: 251; }
+      50%  { stroke-dashoffset: 63; }
+      100% { stroke-dashoffset: 251; }
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(139,92,246,0.45); }
+      50%      { box-shadow: 0 0 0 9px rgba(139,92,246,0); }
+    }
+    @keyframes dotFlash {
+      0%,80%,100% { opacity: 0.2; }
+      40%         { opacity: 1; }
+    }
+    @keyframes imgReveal {
+      from { opacity: 0; transform: scale(0.96); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    @keyframes overlayOut {
+      from { opacity: 1; pointer-events: all; }
+      to   { opacity: 0; pointer-events: none; }
+    }
+    @keyframes stepCheck {
+      from { transform: scale(0); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    @keyframes statusIn {
+      from { opacity: 0; transform: translateX(-8px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes progFill {
+      from { width: 0%; }
+      to   { width: 100%; }
+    }
+    @keyframes heatReveal {
+      0%   { opacity: 0; transform: scale(0.94); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Overlay ── */
+    #px-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #08080d;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.2rem;
+      animation: overlayOut 0.55s cubic-bezier(0.22,1,0.36,1) 3.8s both;
+    }
+
+    /* ── Step cards ── */
+    .px-step {
+      display: flex; align-items: center; gap: 0.85rem;
+      padding: 0.65rem 1.2rem;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid transparent;
+      transition: background 0.4s, border-color 0.4s;
+    }
+    .px-step.active {
+      background: rgba(139,92,246,0.06);
+      border-color: rgba(139,92,246,0.2);
+    }
+    .px-step.done {
+      background: rgba(34,197,94,0.04);
+      border-color: rgba(34,197,94,0.15);
+    }
+    .px-step-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: background 0.4s, border-color 0.4s;
+      flex-shrink: 0;
+    }
+    .px-step.active .px-step-icon { background: rgba(139,92,246,0.1); border-color: rgba(139,92,246,0.3); }
+    .px-step.done   .px-step-icon { background: rgba(34,197,94,0.1);  border-color: rgba(34,197,94,0.3); }
+    .px-step-label {
+      font-family: 'DM Sans', sans-serif; font-size: 0.82rem; color: #555; transition: color 0.3s;
+    }
+    .px-step.active .px-step-label { color: #fff; font-weight: 500; }
+    .px-step.done   .px-step-label { color: #22c55e; }
+    .px-step-sub {
+      font-family: 'DM Sans', sans-serif; font-size: 0.68rem; color: #444; margin-top: 0.15rem; transition: color 0.3s;
+    }
+    .px-step.active .px-step-sub { color: #888; }
+    .px-step.done   .px-step-sub { color: #5a9; }
+
+    /* ── Panel ── */
+    .panel {
+      animation: fadeInUp 0.5s cubic-bezier(0.22,1,0.36,1) 4.5s both;
+    }
+
+    .split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.4rem;
+      min-height: 480px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+      transition: box-shadow 0.25s;
+    }
+    .card:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.08); }
+
+    .card-header {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.9rem 1.4rem;
+      border-bottom: 1px solid var(--border-inner);
+    }
+    .card-dot {
+      width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+      background: var(--purple);
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+    .card-label {
+      font-family: 'Rajdhani', sans-serif; font-weight: 600;
+      font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; color: #888;
+    }
+    .card-body {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 1.2rem; overflow: hidden; position: relative;
+    }
+
+    /* ── Heatmap ── */
+    .heatmap-img {
+      max-width: 100%; max-height: 100%; border-radius: 10px; object-fit: contain;
+      animation: heatReveal 0.7s cubic-bezier(0.22,1,0.36,1) 5s both;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      padding: 0.6rem 1.4rem;
+      border-top: 1px solid var(--border-inner);
+      font-size: 0.72rem; color: #888;
+      animation: fadeInUp 0.4s ease 5.2s both;
+    }
+    .legend-row { display: flex; align-items: center; gap: 1.2rem; justify-content: center; }
+    .legend-chip {
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .legend-swatch {
+      width: 10px; height: 10px; border-radius: 3px;
+    }
+
+    /* ── Info panel ── */
+    .info-section { width: 100%; animation: imgReveal 0.5s cubic-bezier(0.22,1,0.36,1) 5s both; }
+
+    .info-heading {
+      display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem;
+    }
+    .info-heading-label {
+      font-family: 'Rajdhani', sans-serif; font-weight: 600;
+      font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #888;
+    }
+    .info-body { font-size: 0.78rem; color: #999; line-height: 1.65; margin: 0; }
+    .info-body .info-scroll { max-height: 380px; overflow-y: auto; padding: 1.4rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, #1a1a24 20%, #1a1a24 80%, transparent); }
+
+    .detection-chip {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.6rem;
+      background: #0c0c14; border: 1px solid #1a1a24; border-radius: 8px;
+      font-size: 0.76rem; color: #ccc;
+    }
+    .detection-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .detection-chip-conf {
+      margin-left: auto; font-size: 0.68rem; color: #888;
+      font-family: 'Rajdhani', sans-serif; font-weight: 600;
+    }
+
+    .timestamp {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.68rem; color: #555; letter-spacing: 0.04em;
+    }
+
+    /* ── Progress bar animation stages ── */
+    #px-prog-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+      border-radius: 99px;
+      animation: progFill 3.5s cubic-bezier(0.22,1,0.36,1) forwards;
+    }
+
+    /* ── Step timing via CSS ── */
+    #px-step-1 { animation: none; }
+    /* We control steps via JS timeout below */
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     OVERLAY (auto-dismiss after ~4s)
+════════════════════════════════════ -->
+
+
+<!-- ════════════════════════════════════
+     PANEL BODY
+════════════════════════════════════ -->
+<div class="panel">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:1.2rem;">
+    <div style="font-family:'Rajdhani',sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#fff;">
+      GradCAM <span style="color:#8b5cf6;">Explainability</span>
+    </div>
+    <div style="font-size:0.75rem;color:#b0b0a8;letter-spacing:0.1em;text-transform:uppercase;font-family:'Rajdhani',sans-serif;font-weight:600;">
+      XAI · Neural Attention
+    </div>
+  </div>
+
+  <!-- Two-column split -->
+  <div class="split-grid">
+
+    <!-- LEFT: HEATMAP -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot"></div>
+        <span class="card-label">Activation Heatmap</span>
+      </div>
+      <div class="card-body" style="padding:1.2rem;">
+        <!-- Dummy heatmap using a canvas-generated gradient -->
+        <canvas id="heatmap-canvas" width="360" height="320"
+          style="border-radius:10px;max-width:100%;max-height:100%;object-fit:contain;animation:heatReveal 0.7s cubic-bezier(0.22,1,0.36,1) 4.8s both;opacity:0;">
+        </canvas>
+      </div>
+      <!-- Legend -->
+      <div class="legend">
+        <div class="legend-row">
+          <div class="legend-chip">
+            <div class="legend-swatch" style="background:linear-gradient(135deg,#ef4444,#f97316);"></div>
+            <span>Warm = high activation</span>
+          </div>
+          <div class="legend-chip">
+            <div class="legend-swatch" style="background:linear-gradient(135deg,#3b82f6,#06b6d4);"></div>
+            <span>Cool = low activation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: INFO -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-dot"></div>
+        <span class="card-label">Explainability Analysis</span>
+      </div>
+      <div class="card-body" style="padding:0;align-items:stretch;justify-content:flex-start;">
+        <div class="info-scroll" style="max-height:420px;overflow-y:auto;padding:1.4rem;display:flex;flex-direction:column;gap:1rem;animation:imgReveal 0.5s cubic-bezier(0.22,1,0.36,1) 5s both;opacity:0;">
+
+          <!-- What is GradCAM -->
+          <div>
+            <div class="info-heading">
+              <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#8b5cf6;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span class="info-heading-label">What is GradCAM?</span>
+            </div>
+            <p class="info-body">Gradient-weighted Class Activation Mapping (GradCAM) uses the gradients flowing into the final convolutional layer to produce a coarse localisation map highlighting important regions the model focused on for its prediction.</p>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- How to Read -->
+          <div>
+            <div class="info-heading">
+              <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#8b5cf6;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              <span class="info-heading-label">How to Read</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.78rem;color:#999;line-height:1.55;">
+                <div style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#ef4444,#f97316);flex-shrink:0;margin-top:4px;"></div>
+                <span><strong style="color:#ef4444;">Warm regions</strong> (red/orange) indicate high neural activation — these are the features that most influenced the model's classification decision.</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:0.55rem;font-size:0.78rem;color:#999;line-height:1.55;">
+                <div style="width:10px;height:10px;border-radius:3px;background:linear-gradient(135deg,#3b82f6,#06b6d4);flex-shrink:0;margin-top:4px;"></div>
+                <span><strong style="color:#3b82f6;">Cool regions</strong> (blue/cyan) indicate low activation — these areas had minimal impact on the prediction.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Detection Context -->
+          <div>
+            <div class="info-heading">
+              <svg viewBox="0 0 24 24" width="14" height="14" style="stroke:#8b5cf6;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              <span class="info-heading-label">Detection Context</span>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0.35rem;">
+              <div class="detection-chip">
+                <div class="detection-chip-dot" style="background:#e74c3c;"></div>
+                <span>black_core</span>
+                <span class="detection-chip-conf">94.3%</span>
+              </div>
+              <div class="detection-chip">
+                <div class="detection-chip-dot" style="background:#e67e22;"></div>
+                <span>crack</span>
+                <span class="detection-chip-conf">87.1%</span>
+              </div>
+              <div class="detection-chip">
+                <div class="detection-chip-dot" style="background:#f1c40f;"></div>
+                <span>finger</span>
+                <span class="detection-chip-conf">72.6%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timestamp -->
+          <div class="timestamp">
+            <svg viewBox="0 0 24 24" width="11" height="11" style="stroke:#555;fill:none;stroke-width:2;stroke-linecap:round;">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Generated at <span id="gen-time">--:--:-- --</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /split -->
+
+</div><!-- /panel -->
+
+
+<script>
+  /* ── Set timestamp ── */
+  document.getElementById('gen-time').textContent = new Date().toLocaleTimeString();
+
+  /* ── Draw dummy heatmap on canvas ── */
+  function drawHeatmap() {
+    var canvas = document.getElementById('heatmap-canvas');
+    var ctx = canvas.getContext('2d');
+    var W = canvas.width, H = canvas.height;
+
+    /* Base: dark solar panel background */
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, W, H);
+
+    /* Draw faint grid lines (solar cell pattern) */
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx <= W; gx += 40) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (var gy = 0; gy <= H; gy += 40) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+
+    /* Hot zone 1: main defect blob — upper-right (red) */
+    var g1 = ctx.createRadialGradient(245, 85, 0, 245, 85, 110);
+    g1.addColorStop(0,   'rgba(239,68,68,0.92)');
+    g1.addColorStop(0.3, 'rgba(249,115,22,0.7)');
+    g1.addColorStop(0.6, 'rgba(234,179,8,0.3)');
+    g1.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
+
+    /* Hot zone 2: secondary (orange-yellow) */
+    var g2 = ctx.createRadialGradient(90, 200, 0, 90, 200, 75);
+    g2.addColorStop(0,   'rgba(249,115,22,0.8)');
+    g2.addColorStop(0.4, 'rgba(234,179,8,0.4)');
+    g2.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+
+    /* Warm smear — middle */
+    var g3 = ctx.createRadialGradient(180, 160, 0, 180, 160, 90);
+    g3.addColorStop(0,   'rgba(234,179,8,0.5)');
+    g3.addColorStop(0.5, 'rgba(59,130,246,0.2)');
+    g3.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = g3; ctx.fillRect(0, 0, W, H);
+
+    /* Cool zone (blue) */
+    var g4 = ctx.createRadialGradient(300, 260, 0, 300, 260, 80);
+    g4.addColorStop(0,   'rgba(59,130,246,0.55)');
+    g4.addColorStop(0.5, 'rgba(6,182,212,0.25)');
+    g4.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = g4; ctx.fillRect(0, 0, W, H);
+
+    /* Another cool blob — bottom left */
+    var g5 = ctx.createRadialGradient(40, 290, 0, 40, 290, 55);
+    g5.addColorStop(0,   'rgba(6,182,212,0.45)');
+    g5.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = g5; ctx.fillRect(0, 0, W, H);
+
+    /* Slight vignette */
+    var vgn = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.75);
+    vgn.addColorStop(0,   'rgba(0,0,0,0)');
+    vgn.addColorStop(1,   'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vgn; ctx.fillRect(0, 0, W, H);
+  }
+
+  drawHeatmap();
+
+  /* ── Overlay step animation sequence ── */
+  function setText(main, sub) {
+    var t = document.getElementById('px-status-text');
+    var s = document.getElementById('px-status-sub');
+    t.style.animation = 'none'; void t.offsetWidth;
+    t.style.animation = 'statusIn 0.35s ease both';
+    t.textContent = main;
+    s.style.animation = 'none'; void s.offsetWidth;
+    s.style.animation = 'statusIn 0.35s 0.08s ease both';
+    s.textContent = sub;
+  }
+
+  function activateStep(n, sub) {
+    var el = document.getElementById('px-step-' + n);
+    el.className = 'px-step active';
+    document.getElementById('px-step-' + n + '-icon').style.stroke = '#8b5cf6';
+    document.getElementById('px-step-' + n + '-sub').textContent = sub;
+  }
+
+  function doneStep(n, sub) {
+    var el = document.getElementById('px-step-' + n);
+    el.className = 'px-step done';
+    document.getElementById('px-step-' + n + '-icon').style.stroke = '#22c55e';
+    document.getElementById('px-step-' + n + '-sub').textContent = sub;
+  }
+
+  /* Timeline */
+  setTimeout(function() {
+    activateStep(1, 'Loading EL image from detection...');
+    setText('Preparing Image', 'Using image from defect detection...');
+  }, 400);
+
+  setTimeout(function() {
+    doneStep(1, 'sample_panel.jpg ready');
+    activateStep(2, 'Running neural network backward pass...');
+    setText('Generating Heatmap', 'Computing gradient-weighted activations...');
+  }, 1300);
+
+  setTimeout(function() {
+    doneStep(2, 'Heatmap generated successfully');
+    activateStep(3, 'Building visualisation...');
+    setText('Rendering Results', 'Preparing heatmap display...');
+  }, 2400);
+
+  setTimeout(function() {
+    doneStep(3, 'All steps complete');
+    setText('Complete', 'Explainability pipeline finished.');
+  }, 3200);
+
+  /* Reveal canvas & info after overlay fades */
+  setTimeout(function() {
+    var canvas = document.getElementById('heatmap-canvas');
+    canvas.style.opacity = '1';
+    canvas.style.animation = 'heatReveal 0.7s cubic-bezier(0.22,1,0.36,1) both';
+
+    var infoScroll = document.querySelector('.info-scroll');
+    if (infoScroll) {
+      infoScroll.style.opacity = '1';
+      infoScroll.style.animation = 'imgReveal 0.5s cubic-bezier(0.22,1,0.36,1) both';
+    }
+  }, 4600);
+</script>
+
+</body>
+</html>
